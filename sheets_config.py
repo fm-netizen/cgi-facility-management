@@ -16,7 +16,7 @@ SHEET_NAMES = {
 # 바로가기 URL 설정
 QUICK_LINKS = {
     "📊 Master Status Sheet": f"https://docs.google.com/spreadsheets/d/1ttWrMsylk1rREaC6T9PYDZAaxe18hm8JhX7jJg-c_YY/edit",
-    "📋 Task Tracker":        "YOUR_TASK_TRACKER_URL",
-    "📁 Google Drive":        "https://drive.google.com/drive/folders/YOUR_FOLDER_ID",
-    "💬 Slack #cgi-facility-dev": "https://app.slack.com/client/YOUR_WORKSPACE/C0BC4S9AACS",
+    "📋 Task Tracker":        "https://docs.google.com/spreadsheets/d/1KklNrOvg-Nov3tkEGBWqCYGs8AQiOCqeUWDJh81UqYY/edit?gid=1564917165#gid=1564917165",
+    "📁 Google Drive":        "https://drive.google.com/drive/u/0/folders/1iZGAygQTWYS1U5uHWz5UxfQ6_dRMvsB9",
+    "💬 Slack #cgi-facility-dev": "https://app.slack.com/client/T0B6V3G2AM9/C0BC4S9AACS",
 }
