@@ -1,4 +1,5 @@
 import streamlit as st
+from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
 from datetime import date
 
 def show():
@@ -8,10 +9,10 @@ def show():
     # ── 상단 바로가기 버튼 ──────────────────────────────────
     st.markdown("**🔗 빠른 바로가기**")
     q1, q2, q3, q4 = st.columns(4)
-    q1.link_button("📊 Master Status Sheet", "YOUR_MASTER_SHEET_URL",  use_container_width=True)
-    q2.link_button("📋 Task Tracker",        "YOUR_TASK_TRACKER_URL",  use_container_width=True)
-    q3.link_button("📁 Google Drive",        "YOUR_DRIVE_FOLDER_URL",  use_container_width=True)
-    q4.link_button("💬 Slack #cgi-facility", "https://app.slack.com/client/YOUR_WORKSPACE/C0BC4S9AACS", use_container_width=True)
+    q1.link_button("📊 Master Status Sheet", MASTER_SHEET_URL,  use_container_width=True)
+    q2.link_button("📋 Task Tracker",        TASK_TRACKER_URL,  use_container_width=True)
+    q3.link_button("📁 Google Drive",        DRIVE_FOLDER_URL,  use_container_width=True)
+    q4.link_button("💬 Slack #cgi-facility-dev", SLACK_URL, use_container_width=True)
     st.markdown("---")
 
     # ── KPI ────────────────────────────────────────────────

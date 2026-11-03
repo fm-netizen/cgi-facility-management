@@ -1,4 +1,5 @@
 import streamlit as st
+from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
 import pandas as pd
 from datetime import date
 
@@ -11,9 +12,9 @@ def show():
     # 상단 바로가기
     st.markdown("**🔗 관련 문서 바로가기**")
     c1, c2, c3 = st.columns(3)
-    c1.link_button("📊 Master Status Sheet", "YOUR_MASTER_SHEET_URL", use_container_width=True)
-    c2.link_button("📋 Task Tracker", "YOUR_TASK_TRACKER_URL", use_container_width=True)
-    c3.link_button("📁 Google Drive", "YOUR_DRIVE_FOLDER_URL", use_container_width=True)
+    c1.link_button("📊 Master Status Sheet", MASTER_SHEET_URL, use_container_width=True)
+    c2.link_button("📋 Task Tracker", TASK_TRACKER_URL, use_container_width=True)
+    c3.link_button("📁 Google Drive", DRIVE_FOLDER_URL, use_container_width=True)
     st.markdown("---")
 
     col_f1, col_f2 = st.columns(2)
