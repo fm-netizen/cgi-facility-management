@@ -13,10 +13,15 @@ SHEET_NAMES = {
     "task":        "📋 Active Tasks",
 }
 
-# 바로가기 URL 설정
+# 바로가기 URL 설정 (여기 한 곳만 수정하면 앱 전체에 반영됨)
+MASTER_SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit"
+TASK_TRACKER_URL = "https://docs.google.com/spreadsheets/d/1KklNrOvg-Nov3tkEGBWqCYGs8AQiOCqeUWDJh81UqYY/edit?gid=1564917165#gid=1564917165"
+DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1iZGAygQTWYS1U5uHWz5UxfQ6_dRMvsB9"
+SLACK_URL        = "https://app.slack.com/client/T0B6V3G2AM9/C0BC4S9AACS"  # #cgi-facility-dev (비공개 채널)
+
 QUICK_LINKS = {
-    "📊 Master Status Sheet": f"https://docs.google.com/spreadsheets/d/1ttWrMsylk1rREaC6T9PYDZAaxe18hm8JhX7jJg-c_YY/edit",
-    "📋 Task Tracker":        "https://docs.google.com/spreadsheets/d/1KklNrOvg-Nov3tkEGBWqCYGs8AQiOCqeUWDJh81UqYY/edit?gid=1564917165#gid=1564917165",
-    "📁 Google Drive":        "https://drive.google.com/drive/u/0/folders/1iZGAygQTWYS1U5uHWz5UxfQ6_dRMvsB9",
-    "💬 Slack #cgi-facility-dev": "https://app.slack.com/client/T0B6V3G2AM9/C0BC4S9AACS",
+    "📊 Master Status Sheet":    MASTER_SHEET_URL,
+    "📋 Task Tracker":           TASK_TRACKER_URL,
+    "📁 Google Drive":           DRIVE_FOLDER_URL,
+    "💬 Slack #cgi-facility-dev": SLACK_URL,
 }

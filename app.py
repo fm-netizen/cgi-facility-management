@@ -7,13 +7,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ── Quick Links 설정 (실제 URL로 교체) ──────────────────────
-QUICK_LINKS = {
-    "📊 Master Status Sheet": "YOUR_MASTER_SHEET_URL",
-    "📋 Task Tracker":        "YOUR_TASK_TRACKER_URL",
-    "📁 Google Drive":        "YOUR_DRIVE_FOLDER_URL",
-    "💬 Slack":               "https://app.slack.com/client/YOUR_WORKSPACE/C0BC4S9AACS",
-}
+# ── Quick Links 설정 (sheets_config.py에서 관리) ──────────────
+from sheets_config import QUICK_LINKS
 
 # ── Sidebar ──────────────────────────────────────────────────
 st.sidebar.markdown(
