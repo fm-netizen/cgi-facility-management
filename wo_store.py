@@ -27,6 +27,8 @@ DIR_COLS = ["품목코드", "구분", "카테고리", "품명", "규격·모델"
             "위치 설명", "구매처", "관련 설비", "공구 사용 현황", "비고"]
 LOC_COLS = ["위치코드", "구역코드", "구역명", "보관설비", "단", "칸", "위치 설명", "비고"]
 WORKER_COLS = ["이름", "역할", "배정구분", "활성", "연락처", "비고"]
+MAT_COLS = ["WO번호", "일시", "품목코드", "품명", "수량", "단위", "단가(US$)", "금액(US$)",
+            "입력자", "비고", "직접입력 품명", "직접입력 단위", "직접입력 단가(US$)", "등록 상태"]
 
 WORK_TYPES = ["수리", "서비스", "정기점검(PM)", "긴급", "설치", "행정", "기타"]
 ZONES = ["수영장", "Gym", "락커룸(남)", "락커룸(여)", "스파·사우나", "기계실", "지붕",
@@ -105,7 +107,7 @@ def load_all():
         ss = _ss()
         if ss is None:
             return None
-        names = [SHEET_WO, SHEET_LOG, SHEET_WORKER, SHEET_DIR, SHEET_LOC]
+        names = [SHEET_WO, SHEET_LOG, SHEET_WORKER, SHEET_DIR, SHEET_LOC, SHEET_MAT]
         res = ss.values_batch_get(
             [f"'{n}'!A1:Z" for n in names],
             params={"valueRenderOption": "UNFORMATTED_VALUE",
@@ -141,8 +143,25 @@ def load_all():
         directory[c] = directory[c].map(_txt)
 
     locations = _frame(vr[4], LOC_COLS)
+    mat = _frame(vr[5] if len(vr) > 5 else [], MAT_COLS)
+    for c in ["WO번호", "품목코드", "직접입력 품명", "직접입력 단위", "입력자"]:
+        mat[c] = mat[c].map(_txt)
     return {"wo": wo, "log": log, "workers": workers,
-            "directory": directory, "locations": locations}
+            "directory": directory, "locations": locations, "mat": mat}
+
+
+def unregistered_summary(mat):
+    """직접 입력(코드 없는) 자재를 품명별로 집계 — 디렉토리 등록 후보."""
+    m = mat[(mat["품목코드"] == "") & (mat["직접입력 품명"] != "")].copy()
+    if m.empty:
+        return m
+    m["수량"] = pd.to_numeric(m["수량"], errors="coerce").fillna(0)
+    m["단가"] = pd.to_numeric(m["직접입력 단가(US$)"], errors="coerce")
+    m["key"] = m["직접입력 품명"].str.strip().str.lower()
+    g = m.groupby("key").agg(품명=("직접입력 품명", "last"), 사용횟수=("WO번호", "count"),
+                             총수량=("수량", "sum"), 단위=("직접입력 단위", "last"),
+                             최근단가=("단가", "last"), 최근WO=("WO번호", "last"))
+    return g.sort_values("사용횟수", ascending=False).reset_index(drop=True)
 
 
 def clear_cache():
@@ -314,7 +333,7 @@ def pause_work(wo_no, worker, at=None, reason=""):
 
 def complete_work(wo_no, worker, *, at=None, workers=None, deduct_min=0,
                   outside_cost=0.0, comment="", photo="", materials=None):
-    """완료 보고. materials: [(품목코드, 수량)]."""
+    """완료 보고. materials: [dict(code, name, qty, unit, price)] — code 없으면 직접 입력으로 저장."""
     try:
         d = load_all()
         ss = _ss()
@@ -351,15 +370,21 @@ def complete_work(wo_no, worker, *, at=None, workers=None, deduct_min=0,
             (f"Z{r}", [[flag_txt]]),
         ])
 
-        mats = [(c, q) for c, q in (materials or []) if c and q]
+        mats = [m for m in (materials or [])
+                if (m.get("code") or m.get("name")) and (m.get("qty") or 0) > 0]
         if mats:
             ws_m = ss.worksheet(SHEET_MAT)
             start = _next_row(ws_m)
             ups = []
-            for i, (code, qty) in enumerate(mats):
+            for i, m in enumerate(mats):
                 rr = start + i
+                code = m.get("code") or ""
                 ups += [(f"A{rr}:C{rr}", [[wo_no, fmt_dt(t), code]]),
-                        (f"E{rr}", [[qty]]), (f"I{rr}", [[worker]])]
+                        (f"E{rr}", [[m["qty"]]]), (f"I{rr}", [[worker]])]
+                if not code:
+                    price = m.get("price")
+                    ups.append((f"K{rr}:M{rr}", [[m["name"].strip(), (m.get("unit") or "").strip(),
+                                                  price if price else ""]]))
             _write(ws_m, ups)
 
         todo = _todo_row(w["할일#"])
