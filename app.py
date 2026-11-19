@@ -24,7 +24,9 @@ st.sidebar.markdown("---")
 # Navigation
 st.sidebar.markdown("**📋 메뉴**")
 pages = {
-    "🏠 홈":              "home",
+    "🏠 홈 (대시보드)":   "home",
+    "🎫 작업 티켓":       "work_orders",
+    "📲 현장 입력":       "field_input",
     "🏢 시설 상황":        "facility",
     "⚙️ 설비 상황":        "equipment",
     "🗓️ 메인트넌스 일정":  "maintenance",
@@ -37,7 +39,7 @@ if "page" not in st.session_state:
 for label, key in pages.items():
     if st.sidebar.button(
         label,
-        use_container_width=True,
+        width="stretch",
         type="primary" if st.session_state.page == key else "secondary"
     ):
         st.session_state.page = key
@@ -84,13 +86,17 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.1 · 2026")
+st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.3 · 2026")
 
 # ── Page Router ──────────────────────────────────────────────
 page = st.session_state.page
 
 if page == "home":
     from pages_content import home; home.show()
+elif page == "work_orders":
+    from pages_content import work_orders; work_orders.show()
+elif page == "field_input":
+    from pages_content import field_input; field_input.show()
 elif page == "facility":
     from pages_content import facility; facility.show()
 elif page == "equipment":

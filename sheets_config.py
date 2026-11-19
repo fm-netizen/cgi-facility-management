@@ -13,15 +13,19 @@ SHEET_NAMES = {
     "task":        "📋 Active Tasks",
 }
 
+# 할 일 관리표 (대시보드·현장 입력 데이터 원본)
+TODO_SPREADSHEET_ID = "1ZKARUthXvulkId6pPKD4iaCjy9Wg2FSMRsS_WXYK3RE"   # CGI FM 할 일 관리표 (To-do)
+TODO_SHEET_NAME     = "할 일"
+
 # 바로가기 URL 설정 (여기 한 곳만 수정하면 앱 전체에 반영됨)
 MASTER_SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edit"
-TASK_TRACKER_URL = "https://docs.google.com/spreadsheets/d/1KklNrOvg-Nov3tkEGBWqCYGs8AQiOCqeUWDJh81UqYY/edit?gid=1564917165#gid=1564917165"
+TASK_TRACKER_URL = f"https://docs.google.com/spreadsheets/d/{TODO_SPREADSHEET_ID}/edit"
 DRIVE_FOLDER_URL = "https://drive.google.com/drive/folders/1iZGAygQTWYS1U5uHWz5UxfQ6_dRMvsB9"
 SLACK_URL        = "https://app.slack.com/client/T0B6V3G2AM9/C0BC4S9AACS"  # #cgi-facility-dev (비공개 채널)
 
 QUICK_LINKS = {
     "📊 Master Status Sheet":    MASTER_SHEET_URL,
-    "📋 Task Tracker":           TASK_TRACKER_URL,
+    "📋 할 일 관리표":           TASK_TRACKER_URL,
     "📁 Google Drive":           DRIVE_FOLDER_URL,
     "💬 Slack #cgi-facility-dev": SLACK_URL,
 }
