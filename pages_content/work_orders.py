@@ -86,20 +86,39 @@ def _complete_form(row, data, me, hours):
                                placeholder="원인 / 조치 내용 / 후속 필요 사항")
         photo = st.text_input("사진 링크 (선택)", key=f"ph_{wo_no}",
                               placeholder="Google Drive·Photos 공유 링크")
-        st.markdown("사용 자재·부품 (없으면 비워두기)")
+        st.markdown("사용 자재·부품 (없으면 비워두기) — 목록에 없으면 **직접 입력 품명**에 적으세요")
         mats = st.data_editor(
-            pd.DataFrame({"품목": [""] * 3, "수량": [0.0] * 3}),
+            pd.DataFrame({"목록에서 선택": [""] * 3, "직접 입력 품명": [""] * 3,
+                          "수량": [0.0] * 3, "단위": [""] * 3, "단가(US$)": [0.0] * 3}),
             column_config={
-                "품목": st.column_config.SelectboxColumn("품목", options=opts, width="large"),
+                "목록에서 선택": st.column_config.SelectboxColumn("목록에서 선택", options=opts, width="medium"),
+                "직접 입력 품명": st.column_config.TextColumn("직접 입력 품명", width="medium",
+                                                             help="예: 1/2\" PVC 엘보, GFCI 콘센트 20A"),
                 "수량": st.column_config.NumberColumn("수량", min_value=0.0, step=1.0),
+                "단위": st.column_config.TextColumn("단위", help="EA, ft, gal, Box 등 (직접 입력 시)"),
+                "단가(US$)": st.column_config.NumberColumn("단가(US$)", min_value=0.0, step=0.5,
+                                                          format="$%.2f", help="모르면 0"),
             },
             num_rows="dynamic", hide_index=True, key=f"mt_{wo_no}", width="stretch")
         if st.form_submit_button("■ 완료 저장", type="primary", width="stretch"):
             if not comment.strip():
                 st.error("결과 코멘트를 입력하세요.")
                 return
-            used = [(str(r["품목"]).split(" | ")[0], float(r["수량"] or 0))
-                    for _, r in mats.iterrows() if r["품목"] and (r["수량"] or 0) > 0]
+            used, bad = [], 0
+            for _, r in mats.iterrows():
+                code = str(r["목록에서 선택"] or "").split(" | ")[0].strip()
+                name = str(r["직접 입력 품명"] or "").strip()
+                qty = float(r["수량"] or 0)
+                if not code and not name:
+                    continue
+                if qty <= 0:
+                    bad += 1
+                    continue
+                used.append({"code": code, "name": name if not code else "", "qty": qty,
+                             "unit": str(r["단위"] or ""), "price": float(r["단가(US$)"] or 0)})
+            if bad:
+                st.error(f"수량이 0인 자재 {bad}건이 있습니다. 수량을 입력하거나 행을 비우세요.")
+                return
             _say(*ws.complete_work(wo_no, me, at=at, workers=crew or [me],
                                    deduct_min=deduct, outside_cost=outside,
                                    comment=comment.strip(), photo=photo.strip(), materials=used))
@@ -214,6 +233,15 @@ def _tab_parts(data):
     st.dataframe(view[["품목코드", "품명", "규격·모델", "현재고", "단위", "재고 상태",
                        "보관위치코드", "위치 설명", "공구 사용 현황"]],
                  hide_index=True, width="stretch")
+    pending = ws.unregistered_summary(data["mat"])
+    with st.expander(f"🆕 직접 입력 자재 (디렉토리 미등록) {len(pending)}종"):
+        if pending.empty:
+            st.caption("아직 없습니다.")
+        else:
+            st.caption("자주 쓰는 품목부터 디렉토리에 코드를 부여해 등록하세요. "
+                       "등록 후 '🔩 자재 사용' 탭의 해당 행 품목코드 칸에 코드를 넣으면 재고에 반영됩니다.")
+            st.dataframe(pending, hide_index=True, width="stretch",
+                         column_config={"최근단가": st.column_config.NumberColumn(format="$%.2f")})
     with st.expander("📍 보관 위치 코드 목록"):
         st.dataframe(data["locations"][["위치코드", "구역명", "보관설비", "위치 설명"]],
                      hide_index=True, width="stretch")
