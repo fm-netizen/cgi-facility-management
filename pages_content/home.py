@@ -1,54 +1,82 @@
 import streamlit as st
+import plotly.express as px
+
 from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
-from datetime import date
+from todo_store import load_todos, summarize, today
+
+LIST_COLS = ["번호", "할 일", "우선순위", "마감일", "상태"]
+
+
+def _table(df, cols=LIST_COLS, empty="없음"):
+    if df.empty:
+        st.caption(empty)
+    else:
+        st.dataframe(df[cols], width="stretch", hide_index=True)
+
 
 def show():
+    t = today()
     st.title("🏠 CGI Facility Management")
-    st.caption(f"111 Homans Ave, Closter, NJ · {date.today().strftime('%Y년 %m월 %d일')}")
+    st.caption(f"111 Homans Ave, Closter, NJ · {t.strftime('%Y년 %m월 %d일')}")
 
-    # ── 상단 바로가기 버튼 ──────────────────────────────────
-    st.markdown("**🔗 빠른 바로가기**")
     q1, q2, q3, q4 = st.columns(4)
-    q1.link_button("📊 Master Status Sheet", MASTER_SHEET_URL,  use_container_width=True)
-    q2.link_button("📋 Task Tracker",        TASK_TRACKER_URL,  use_container_width=True)
-    q3.link_button("📁 Google Drive",        DRIVE_FOLDER_URL,  use_container_width=True)
-    q4.link_button("💬 Slack #cgi-facility-dev", SLACK_URL, use_container_width=True)
+    q1.link_button("📊 Master Status Sheet", MASTER_SHEET_URL, width="stretch")
+    q2.link_button("📋 할 일 관리표", TASK_TRACKER_URL, width="stretch")
+    q3.link_button("📁 Google Drive", DRIVE_FOLDER_URL, width="stretch")
+    q4.link_button("💬 Slack #cgi-facility-dev", SLACK_URL, width="stretch")
     st.markdown("---")
 
-    # ── KPI ────────────────────────────────────────────────
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("전체 시설 상태", "양호",  delta="정상 운영 중")
-    with col2: st.metric("설비 이상 건수", "2건",   delta="점검 필요",    delta_color="inverse")
-    with col3: st.metric("이번 달 작업",   "4건",   delta="1건 완료")
-    with col4: st.metric("미완료 메모",    "3건")
+    df = load_todos()
+    if df is None:
+        st.warning("⚠️ Google Sheets 미연결 — 할 일 데이터를 불러올 수 없습니다. "
+                   "Streamlit Secrets의 서비스 계정 설정과 시트 공유를 확인하세요.")
+        err = st.session_state.get("todo_error")
+        if err:
+            st.caption(f"오류: {err}")
+        return
+
+    s = summarize(df)
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("미완료", f"{s['open']}건")
+    c2.metric("진행 중", f"{s['in_progress']}건")
+    c3.metric("마감 초과", f"{len(s['overdue'])}건",
+              delta="즉시 확인" if len(s["overdue"]) else None, delta_color="inverse")
+    c4.metric("7일 내 마감", f"{len(s['due_soon'])}건")
+    rate = round(s["done"] / s["total"] * 100) if s["total"] else 0
+    c5.metric("완료", f"{s['done']}건", delta=f"완료율 {rate}%", delta_color="off")
+
+    if st.button("📲 현장 입력 (할 일 등록·상태 변경)", type="primary", width="stretch"):
+        st.session_state.page = "field_input"
+        st.rerun()
+
     st.markdown("---")
-
-    col_l, col_r = st.columns(2)
-    with col_l:
-        st.subheader("📊 시설 현황 요약")
-        facility_data = {
-            "구역":       ["수영장", "Gym",    "로커룸 (남)", "로커룸 (여)", "사무실",    "공용 복도"],
-            "상태":       ["🟢 정상","🟡 점검중","🟢 정상",   "🟢 정상",    "🟢 정상",   "🟢 정상"],
-            "마지막 점검":["2026-06-15","2026-06-20","2026-06-18","2026-06-18","2026-06-10","2026-06-19"],
-        }
-        st.dataframe(facility_data, use_container_width=True, hide_index=True)
-
-    with col_r:
-        st.subheader("⚠️ 긴급 알림")
-        st.warning("⚙️ **Gym HVAC 필터 교체** 필요 — 2026-06-25 예정")
-        st.warning("💧 **수영장 pH 수치** 재확인 필요 — 오늘 측정값 이상")
-        st.info("✅ 수영장 제습기 교체 PO 발행 완료 (ADE Systems)")
+    left, right = st.columns(2)
+    with left:
+        st.subheader("🔴 마감 초과")
+        _table(s["overdue"])
+        st.subheader("🟡 7일 내 마감")
+        _table(s["due_soon"])
+    with right:
+        st.subheader("⭐ 우선순위 높음 (미완료)")
+        _table(s["high_open"], ["번호", "할 일", "마감일", "상태"])
+        st.subheader("✔️ 최근 7일 완료")
+        _table(s["done_week"], ["번호", "할 일", "완료일"])
 
     st.markdown("---")
+    st.subheader("📊 구분별 미완료")
+    open_df = df[df["상태"] != "완료"]
+    if open_df.empty:
+        st.caption("미완료 항목 없음")
+    else:
+        g = open_df.groupby(["프로젝트/구분", "상태"]).size().reset_index(name="건수")
+        fig = px.bar(g, x="건수", y="프로젝트/구분", color="상태", orientation="h",
+                     color_discrete_map={"진행 전": "#9AA5B1", "진행 중": "#F2B705", "보류": "#F28C38"})
+        fig.update_layout(height=320, margin=dict(l=0, r=0, t=10, b=0), legend_title=None,
+                          yaxis_title=None)
+        st.plotly_chart(fig, width="stretch")
 
-    # ── 내부 메뉴 이동 ──────────────────────────────────────
-    st.subheader("📋 화면 이동")
-    m1, m2, m3, m4 = st.columns(4)
-    with m1:
-        if st.button("🏢 시설 상황",      use_container_width=True): st.session_state.page = "facility";    st.rerun()
-    with m2:
-        if st.button("⚙️ 설비 상황",      use_container_width=True): st.session_state.page = "equipment";   st.rerun()
-    with m3:
-        if st.button("🗓️ 메인트넌스",     use_container_width=True): st.session_state.page = "maintenance"; st.rerun()
-    with m4:
-        if st.button("📝 메모",           use_container_width=True): st.session_state.page = "memo";        st.rerun()
+    with st.expander("📋 전체 미완료 목록"):
+        st.dataframe(open_df[["번호", "프로젝트/구분", "할 일", "우선순위", "마감일", "상태", "비고"]],
+                     width="stretch", hide_index=True)
+    st.caption(f"데이터: CGI FM 할 일 관리표 · 1분마다 갱신 · 총 {s['total']}건")
