@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.express as px
 
 from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
+from ui_links import link_buttons
 from todo_store import load_todos, summarize, today
 
 LIST_COLS = ["번호", "할 일", "우선순위", "마감일", "상태"]
@@ -11,7 +12,11 @@ def _table(df, cols=LIST_COLS, empty="없음"):
     if df.empty:
         st.caption(empty)
     else:
-        st.dataframe(df[cols], width="stretch", hide_index=True)
+        view = df[cols].copy()
+        for c in ("마감일", "완료일", "등록일"):
+            if c in view:
+                view[c] = view[c].map(lambda d: d.strftime("%Y-%m-%d") if d else "—")
+        st.dataframe(view, width="stretch", hide_index=True)
 
 
 def show():
@@ -19,11 +24,10 @@ def show():
     st.title("🏠 CGI Facility Management")
     st.caption(f"111 Homans Ave, Closter, NJ · {t.strftime('%Y년 %m월 %d일')}")
 
-    q1, q2, q3, q4 = st.columns(4)
-    q1.link_button("📊 Master Status Sheet", MASTER_SHEET_URL, width="stretch")
-    q2.link_button("📋 할 일 관리표", TASK_TRACKER_URL, width="stretch")
-    q3.link_button("📁 Google Drive", DRIVE_FOLDER_URL, width="stretch")
-    q4.link_button("💬 Slack #cgi-facility-dev", SLACK_URL, width="stretch")
+    link_buttons([("📊 Master Status Sheet", MASTER_SHEET_URL),
+                  ("📋 할 일 관리표", TASK_TRACKER_URL),
+                  ("📁 Google Drive", DRIVE_FOLDER_URL),
+                  ("💬 Slack #cgi-facility-dev", SLACK_URL)])
     st.markdown("---")
 
     df = load_todos()
@@ -77,6 +81,5 @@ def show():
         st.plotly_chart(fig, width="stretch")
 
     with st.expander("📋 전체 미완료 목록"):
-        st.dataframe(open_df[["번호", "프로젝트/구분", "할 일", "우선순위", "마감일", "상태", "비고"]],
-                     width="stretch", hide_index=True)
+        _table(open_df, ["번호", "프로젝트/구분", "할 일", "우선순위", "마감일", "상태", "비고"])
     st.caption(f"데이터: CGI FM 할 일 관리표 · 1분마다 갱신 · 총 {s['total']}건")

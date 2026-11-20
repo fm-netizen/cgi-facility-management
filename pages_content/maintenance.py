@@ -1,4 +1,5 @@
 import streamlit as st
+from ui_links import link_buttons
 from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
 import pandas as pd
 from datetime import date, timedelta
@@ -12,10 +13,9 @@ def show():
 
     # 바로가기
     st.markdown("**🔗 관련 문서 바로가기**")
-    c1, c2, c3 = st.columns(3)
-    c1.link_button("📊 Master Status Sheet", MASTER_SHEET_URL, use_container_width=True)
-    c2.link_button("📋 Task Tracker",        TASK_TRACKER_URL, use_container_width=True)
-    c3.link_button("💬 Slack",               SLACK_URL, use_container_width=True)
+    link_buttons([("📊 Master Status Sheet", MASTER_SHEET_URL),
+                  ("📋 할 일 관리표", TASK_TRACKER_URL),
+                  ("💬 Slack", SLACK_URL)])
     st.markdown("---")
 
     if "maintenance_data" not in st.session_state:
@@ -45,7 +45,7 @@ def show():
     if f_cat      != "전체": fdf = fdf[fdf["카테고리"] == f_cat]
     if f_priority != "전체": fdf = fdf[fdf["우선순위"] == f_priority]
     if f_status   != "전체": fdf = fdf[fdf["상태"] == f_status]
-    st.dataframe(fdf, use_container_width=True, hide_index=True)
+    st.dataframe(fdf, width="stretch", hide_index=True)
     st.markdown("---")
 
     tab1, tab2 = st.tabs(["✏️ 상태 업데이트", "➕ 작업 추가"])
@@ -61,7 +61,7 @@ def show():
             with col_b:
                 new_cost = st.number_input("실제 비용 ($)", min_value=0, step=50)
                 note     = st.text_input("비고")
-            if st.form_submit_button("업데이트", type="primary", use_container_width=True):
+            if st.form_submit_button("업데이트", type="primary", width="stretch"):
                 for item in st.session_state.maintenance_data:
                     if item["작업명"] == selected:
                         item["상태"] = new_status
@@ -89,7 +89,7 @@ def show():
                 plan_date = st.date_input("예정일")
                 cost      = st.number_input("예상 비용 ($)", min_value=0, step=50)
             note = st.text_input("비고")
-            if st.form_submit_button("추가", type="primary", use_container_width=True):
+            if st.form_submit_button("추가", type="primary", width="stretch"):
                 if name:
                     new_item = {
                         "작업명": name, "카테고리": category, "담당": assignee,

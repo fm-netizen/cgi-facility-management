@@ -61,7 +61,7 @@ def show():
     c4.metric("🔴 고장·수리", len(all_df[all_df["상태"].isin(["🔴 고장", "🔧 수리 중"])]))
 
     st.markdown("---")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     st.markdown("---")
 
@@ -78,7 +78,7 @@ def show():
                 next_check = st.date_input("다음 점검일")
             with col_b:
                 note = st.text_area("비고")
-            if st.form_submit_button("업데이트", type="primary", use_container_width=True):
+            if st.form_submit_button("업데이트", type="primary", width="stretch"):
                 for item in st.session_state.equipment_data:
                     if item["설비명"] == selected:
                         item["상태"] = new_status
@@ -99,7 +99,7 @@ def show():
                 last_check = st.date_input("마지막 점검일")
                 next_check = st.date_input("다음 점검일")
             note = st.text_input("비고")
-            if st.form_submit_button("추가", type="primary", use_container_width=True):
+            if st.form_submit_button("추가", type="primary", width="stretch"):
                 if name:
                     st.session_state.equipment_data.append({
                         "설비명": name, "카테고리": category, "위치": location,

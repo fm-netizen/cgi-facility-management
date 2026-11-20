@@ -1,4 +1,5 @@
 import streamlit as st
+from ui_links import link_buttons
 from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
 import pandas as pd
 from datetime import date
@@ -11,10 +12,9 @@ def show():
 
     # 상단 바로가기
     st.markdown("**🔗 관련 문서 바로가기**")
-    c1, c2, c3 = st.columns(3)
-    c1.link_button("📊 Master Status Sheet", MASTER_SHEET_URL, use_container_width=True)
-    c2.link_button("📋 Task Tracker", TASK_TRACKER_URL, use_container_width=True)
-    c3.link_button("📁 Google Drive", DRIVE_FOLDER_URL, use_container_width=True)
+    link_buttons([("📊 Master Status Sheet", MASTER_SHEET_URL),
+                  ("📋 할 일 관리표", TASK_TRACKER_URL),
+                  ("📁 Google Drive", DRIVE_FOLDER_URL)])
     st.markdown("---")
 
     col_f1, col_f2 = st.columns(2)
@@ -39,7 +39,7 @@ def show():
     df = pd.DataFrame(st.session_state.facility_data)
     if filter_status != "전체": df = df[df["상태"] == filter_status]
     if filter_zone   != "전체": df = df[df["구역"] == filter_zone]
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
     st.markdown("---")
 
     st.subheader("✏️ 상태 업데이트")
@@ -52,7 +52,7 @@ def show():
             temp     = st.text_input("온도 (°F)", placeholder="예: 72")
             humidity = st.text_input("습도 (%)",  placeholder="예: 50")
         note = st.text_area("비고", placeholder="특이사항 입력")
-        submitted = st.form_submit_button("업데이트", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("업데이트", type="primary", width="stretch")
 
         if submitted:
             for item in st.session_state.facility_data:

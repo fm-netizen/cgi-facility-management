@@ -1,4 +1,5 @@
 import streamlit as st
+from ui_links import link_buttons
 from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
 from datetime import datetime, date
 
@@ -9,10 +10,9 @@ def show():
 
     # 바로가기
     st.markdown("**🔗 관련 문서 바로가기**")
-    c1, c2, c3 = st.columns(3)
-    c1.link_button("📋 Task Tracker",  TASK_TRACKER_URL, use_container_width=True)
-    c2.link_button("💬 Slack",         SLACK_URL, use_container_width=True)
-    c3.link_button("📁 Google Drive",  DRIVE_FOLDER_URL, use_container_width=True)
+    link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL),
+                  ("💬 Slack", SLACK_URL),
+                  ("📁 Google Drive", DRIVE_FOLDER_URL)])
     st.markdown("---")
 
     if "memos" not in st.session_state:
@@ -29,7 +29,7 @@ def show():
             with col1: title = st.text_input("제목")
             with col2: tag   = st.selectbox("태그", TAGS)
             content = st.text_area("내용", height=100)
-            if st.form_submit_button("저장", type="primary", use_container_width=True):
+            if st.form_submit_button("저장", type="primary", width="stretch"):
                 if title:
                     now = datetime.now().strftime("%Y-%m-%d %H:%M")
                     st.session_state.memos.insert(0, {
@@ -70,11 +70,11 @@ def show():
         with col_title:
             st.markdown(f"**{icon} {memo['제목']}** &nbsp; {tag_icon} `{memo['태그']}` &nbsp; *{memo['작성일']}*")
         with col_btn1:
-            if st.button("완료" if not memo["완료"] else "미완료", key=f"done_{orig_idx}", use_container_width=True):
+            if st.button("완료" if not memo["완료"] else "미완료", key=f"done_{orig_idx}", width="stretch"):
                 st.session_state.memos[orig_idx]["완료"] = not memo["완료"]
                 st.rerun()
         with col_btn2:
-            if st.button("삭제", key=f"del_{orig_idx}", use_container_width=True):
+            if st.button("삭제", key=f"del_{orig_idx}", width="stretch"):
                 st.session_state.memos.pop(orig_idx)
                 st.rerun()
         if memo["내용"]:
