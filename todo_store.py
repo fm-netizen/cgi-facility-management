@@ -58,7 +58,8 @@ def to_frame(values):
         rows.append(rec)
     df = pd.DataFrame(rows, columns=COLUMNS + ["_row"])
     for c in ["등록일", "마감일", "완료일"]:
-        df[c] = pd.to_datetime(df[c], errors="coerce").dt.date
+        df[c] = pd.to_datetime(df[c], errors="coerce").map(
+            lambda v: v.date() if pd.notna(v) else None).astype(object)
     return df
 
 
