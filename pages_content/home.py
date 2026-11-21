@@ -1,7 +1,8 @@
 import streamlit as st
 import plotly.express as px
 
-from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
+from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL, PROJECT_FOLDERS
+import asset_store as A
 from ui_links import link_buttons
 from todo_store import load_todos, summarize, today
 
@@ -19,15 +20,50 @@ def _table(df, cols=LIST_COLS, empty="없음"):
         st.dataframe(view, width="stretch", hide_index=True)
 
 
+def _asset_strip():
+    """시설·설비 현황 한 줄 요약 (상세는 시설·설비 화면 / 대장 시트)."""
+    st.subheader("🏢 시설·설비 현황")
+    data = A.load_assets()
+    if data is None:
+        st.caption("설비·시설 대장을 불러올 수 없습니다.")
+        return
+    z, e = A.counts(data["zones"]), A.counts(data["equip"])
+    c = st.columns(4)
+    c[0].metric("시설 구역 이상", f"{z['이상']} / {z['전체']}")
+    c[1].metric("설비 이상", f"{e['이상']} / {e['전체']}")
+    c[2].metric("🔴 고장·이상", f"{z['🔴 고장·이상'] + e['🔴 고장·이상']}건")
+    c[3].metric("🔧 수리·공사 중", f"{z['🔧 수리·공사 중'] + e['🔧 수리·공사 중']}건")
+    eq = data["equip"]
+    bad = eq[eq["현재 상태"] != A.NORMAL]
+    order = {s: i for i, s in enumerate(["🔴 고장·이상", "🔧 수리·공사 중", "🟡 점검 필요", "🔄 교체 예정"])}
+    bad = bad.assign(_o=bad["현재 상태"].map(lambda s: order.get(s, 9))).sort_values(["_o", "설비ID"])
+    if bad.empty:
+        st.caption("모든 설비 정상")
+    else:
+        st.dataframe(bad[["설비ID", "설비명", "현재 상태", "최근 비고"]].head(8),
+                     width="stretch", hide_index=True)
+        if len(bad) > 8:
+            st.caption(f"외 {len(bad) - 8}건 — ⚙️ 설비 상황 화면에서 전체 확인")
+    if st.button("⚙️ 설비 상태 기록하기", width="stretch"):
+        st.session_state.page = "equipment"
+        st.rerun()
+
+
 def show():
     t = today()
     st.title("🏠 CGI Facility Management")
     st.caption(f"111 Homans Ave, Closter, NJ · {t.strftime('%Y년 %m월 %d일')}")
 
-    link_buttons([("📊 Master Status Sheet", MASTER_SHEET_URL),
+    link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
                   ("📋 할 일 관리표", TASK_TRACKER_URL),
-                  ("📁 Google Drive", DRIVE_FOLDER_URL),
+                  ("📁 공사 폴더", DRIVE_FOLDER_URL),
                   ("💬 Slack #cgi-facility-dev", SLACK_URL)])
+    with st.expander("📁 공사 프로젝트 폴더"):
+        for name, links in PROJECT_FOLDERS.items():
+            st.markdown(f"**{name}**")
+            link_buttons(links)
+    st.markdown("---")
+    _asset_strip()
     st.markdown("---")
 
     df = load_todos()

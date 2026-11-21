@@ -1,110 +1,113 @@
 import streamlit as st
-import pandas as pd
 
-STATUS_OPTIONS = ["🟢 정상", "🟡 점검 필요", "🔴 고장", "🔧 수리 중", "🔄 교체 예정"]
-CATEGORIES = ["HVAC", "수영장", "Gym 장비", "전기", "배관", "기타"]
+import asset_store as A
+from pages_content.field_input import _check_pin
+from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL
+from ui_links import link_buttons
+import voice
+
+VIEW = ["설비ID", "설비명", "카테고리", "구역ID", "현재 상태", "최근 비고", "다음 점검", "정기 PM ID",
+        "담당", "관련 할 일#"]
+
 
 def show():
     st.title("⚙️ 설비 상황")
-    st.markdown("---")
+    link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
+                  ("📋 할 일 관리표", TASK_TRACKER_URL)])
 
-    # Filter row
-    col1, col2 = st.columns(2)
-    with col1:
-        filter_cat = st.selectbox("카테고리", ["전체"] + CATEGORIES)
-    with col2:
-        filter_status = st.selectbox("상태", ["전체"] + STATUS_OPTIONS)
+    data = A.load_assets()
+    if data is None:
+        st.warning("⚠️ 설비·시설 대장을 불러올 수 없습니다. " + st.session_state.get("asset_error", ""))
+        return
+    eq, zones = data["equip"], data["zones"]
+    c = A.counts(eq)
+    m = st.columns(5)
+    m[0].metric("전체 설비", c["전체"])
+    m[1].metric("🟢 정상", c["🟢 정상"])
+    m[2].metric("🟡 점검 필요", c["🟡 점검 필요"])
+    m[3].metric("🔧·🔴 수리·고장", c["🔧 수리·공사 중"] + c["🔴 고장·이상"])
+    m[4].metric("🔄 교체 예정", c["🔄 교체 예정"])
 
-    st.markdown("---")
-
-    if "equipment_data" not in st.session_state:
-        st.session_state.equipment_data = [
-            # HVAC
-            {"설비명": "RTU #1 (York 5-ton)", "카테고리": "HVAC", "위치": "옥상", "상태": "🔄 교체 예정",
-             "마지막점검": "2026-05-01", "다음점검": "2026-07-01", "비고": "Johnstone Supply 발주 중"},
-            {"설비명": "RTU #2 (York 7.5-ton)", "카테고리": "HVAC", "위치": "옥상", "상태": "🔄 교체 예정",
-             "마지막점검": "2026-05-01", "다음점검": "2026-07-01", "비고": "R-454B A2L 냉매"},
-            {"설비명": "RTU #3 (York 7.5-ton)", "카테고리": "HVAC", "위치": "옥상", "상태": "🔄 교체 예정",
-             "마지막점검": "2026-05-01", "다음점검": "2026-07-01", "비고": "R-454B A2L 냉매"},
-            # Pool
-            {"설비명": "제습기 (DCA3600Y)", "카테고리": "수영장", "위치": "수영장", "상태": "🔄 교체 예정",
-             "마지막점검": "2026-06-01", "다음점검": "2026-07-15", "비고": "ADE Systems PO 완료"},
-            {"설비명": "수영장 펌프 #1", "카테고리": "수영장", "위치": "기계실", "상태": "🟢 정상",
-             "마지막점검": "2026-06-10", "다음점검": "2026-07-10", "비고": ""},
-            {"설비명": "수영장 히터", "카테고리": "수영장", "위치": "기계실", "상태": "🟢 정상",
-             "마지막점검": "2026-06-10", "다음점검": "2026-07-10", "비고": ""},
-            # Gym
-            {"설비명": "Life Fitness CPQ-51716", "카테고리": "Gym 장비", "위치": "Gym", "상태": "🔄 교체 예정",
-             "마지막점검": "2026-06-01", "다음점검": "-", "비고": "계약 완료"},
-            {"설비명": "Life Fitness CPQ-51815", "카테고리": "Gym 장비", "위치": "Gym", "상태": "🔄 교체 예정",
-             "마지막점검": "2026-06-01", "다음점검": "-", "비고": "계약 완료"},
-            {"설비명": "Hoist RS-2201", "카테고리": "Gym 장비", "위치": "Gym", "상태": "🟡 점검 필요",
-             "마지막점검": "2026-05-15", "다음점검": "2026-06-30", "비고": "별도 진행 중"},
-            {"설비명": "Precor AMT 885", "카테고리": "Gym 장비", "위치": "Gym", "상태": "🟡 점검 필요",
-             "마지막점검": "2026-05-15", "다음점검": "2026-06-30", "비고": "별도 진행 중"},
-        ]
-
-    data = st.session_state.equipment_data
-    df = pd.DataFrame(data)
-
-    if filter_cat != "전체":
-        df = df[df["카테고리"] == filter_cat]
-    if filter_status != "전체":
-        df = df[df["상태"] == filter_status]
-
-    # Status summary metrics
-    all_df = pd.DataFrame(st.session_state.equipment_data)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("전체 설비", len(all_df))
-    c2.metric("🟢 정상", len(all_df[all_df["상태"] == "🟢 정상"]))
-    c3.metric("⚠️ 점검·교체", len(all_df[all_df["상태"].isin(["🟡 점검 필요", "🔄 교체 예정"])]))
-    c4.metric("🔴 고장·수리", len(all_df[all_df["상태"].isin(["🔴 고장", "🔧 수리 중"])]))
+    f1, f2, f3 = st.columns(3)
+    fs = f1.selectbox("상태", ["전체", "정상 아님"] + A.STATUSES)
+    fc = f2.selectbox("카테고리", ["전체"] + sorted(eq["카테고리"].replace("", "기타").unique().tolist()))
+    fz = f3.selectbox("구역", ["전체"] + zones["구역ID"].tolist())
+    view = eq
+    if fs == "정상 아님":
+        view = view[view["현재 상태"] != A.NORMAL]
+    elif fs != "전체":
+        view = view[view["현재 상태"] == fs]
+    if fc != "전체":
+        view = view[view["카테고리"] == fc]
+    if fz != "전체":
+        view = view[view["구역ID"] == fz]
+    st.dataframe(view[VIEW], width="stretch", hide_index=True)
 
     st.markdown("---")
-    st.dataframe(df, width="stretch", hide_index=True)
-
-    st.markdown("---")
-
-    # --- Update / Add ---
-    tab1, tab2 = st.tabs(["✏️ 상태 업데이트", "➕ 설비 추가"])
+    if not _check_pin():
+        return
+    author = st.text_input("기록자", value=st.session_state.get("me") or st.session_state.get("author", ""),
+                           placeholder="예: Jay Choi").strip()
+    st.session_state.author = author
+    tab1, tab2, tab3 = st.tabs(["✏️ 상태 기록", "🕘 이력", "➕ 설비 추가"])
+    labels = [f"{r['설비ID']} · {r['설비명']}" for _, r in eq.iterrows()]
 
     with tab1:
-        with st.form("equipment_update"):
-            equip_names = [e["설비명"] for e in st.session_state.equipment_data]
-            selected = st.selectbox("설비 선택", equip_names)
-            col_a, col_b = st.columns(2)
-            with col_a:
-                new_status = st.selectbox("새 상태", STATUS_OPTIONS)
-                next_check = st.date_input("다음 점검일")
-            with col_b:
-                note = st.text_area("비고")
-            if st.form_submit_button("업데이트", type="primary", width="stretch"):
-                for item in st.session_state.equipment_data:
-                    if item["설비명"] == selected:
-                        item["상태"] = new_status
-                        item["다음점검"] = str(next_check)
-                        item["비고"] = note
-                st.success(f"✅ {selected} 업데이트 완료")
-                st.rerun()
+        if not labels:
+            st.info("등록된 설비가 없습니다.")
+        else:
+            pick = st.selectbox("설비", labels, key="eq_pick")
+            eid = pick.split(" · ")[0]
+            cur = eq.set_index("설비ID")["현재 상태"].get(eid, A.NORMAL)
+            st.caption(f"현재: {cur}")
+            spoken = voice.voice_box("eq_voice", "🎤 말로 점검 결과 입력")
+            vn = st.session_state.get("eq_voice_n", 0)
+            with st.form(f"eq_status_{vn}", clear_on_submit=True):
+                status = st.selectbox("상태", A.STATUSES,
+                                      index=A.STATUSES.index(cur) if cur in A.STATUSES else 0)
+                ref = st.text_input("관련 할 일#/WO#", placeholder="선택")
+                note = st.text_area("비고", value=spoken, placeholder="점검 결과·고장 증상·조치 내용",
+                                    key=f"eq_note_{vn}_{len(spoken)}")
+                if st.form_submit_button("기록", type="primary", width="stretch"):
+                    if not author:
+                        st.error("기록자 이름을 입력하세요.")
+                    else:
+                        ok, msg = A.add_status("설비", eid, status, note, author, ref=ref)
+                        (st.success if ok else st.error)(msg)
+                        if ok:
+                            voice.clear("eq_voice")
 
     with tab2:
-        with st.form("equipment_add"):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                name = st.text_input("설비명")
-                category = st.selectbox("카테고리", CATEGORIES)
-                location = st.text_input("위치")
-            with col_b:
-                status = st.selectbox("상태", STATUS_OPTIONS)
-                last_check = st.date_input("마지막 점검일")
-                next_check = st.date_input("다음 점검일")
+        if labels:
+            hid = st.selectbox("설비", labels, key="eq_hist").split(" · ")[0]
+            h = A.load_history(hid)
+            if h is None or h.empty:
+                st.caption("기록 없음")
+            else:
+                st.dataframe(h, width="stretch", hide_index=True)
+
+    with tab3:
+        zlabels = [f"{r['구역ID']} · {r['구역명']}" for _, r in zones.iterrows()]
+        with st.form("eq_add", clear_on_submit=True):
+            a1, a2 = st.columns(2)
+            name = a1.text_input("설비명 *")
+            cat = a2.selectbox("카테고리", A.CATEGORIES)
+            zone = a1.selectbox("구역 *", zlabels) if zlabels else ""
+            loc = a2.text_input("위치 상세")
+            model = a1.text_input("제조사·모델")
+            owner = a2.text_input("담당 (내부/업체)", value="기술")
+            pm = a1.text_input("정기 PM ID", placeholder="예: PM-04")
+            nxt = a2.text_input("다음 점검 (YYYY-MM-DD)")
+            status = st.selectbox("초기 상태", A.STATUSES)
             note = st.text_input("비고")
             if st.form_submit_button("추가", type="primary", width="stretch"):
-                if name:
-                    st.session_state.equipment_data.append({
-                        "설비명": name, "카테고리": category, "위치": location,
-                        "상태": status, "마지막점검": str(last_check),
-                        "다음점검": str(next_check), "비고": note
-                    })
-                    st.success(f"✅ {name} 추가 완료")
-                    st.rerun()
+                if not name or not zone:
+                    st.error("설비명과 구역은 필수입니다.")
+                elif not author:
+                    st.error("기록자 이름을 입력하세요.")
+                else:
+                    rec = {"설비명": name, "카테고리": cat, "구역ID": zone.split(" · ")[0],
+                           "위치 상세": loc, "제조사·모델": model, "담당": owner,
+                           "정기 PM ID": pm, "다음 점검": nxt}
+                    ok, msg = A.add_equipment(eq, rec, status, note, author)
+                    (st.success if ok else st.error)(msg)

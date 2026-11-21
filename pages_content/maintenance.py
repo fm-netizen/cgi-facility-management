@@ -1,108 +1,70 @@
-import streamlit as st
-from ui_links import link_buttons
-from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
-import pandas as pd
-from datetime import date, timedelta
+"""정기 업무(PM) 일정 — 할 일 관리표의 정기 ID(L열) 회차를 기준으로 표시."""
+from datetime import timedelta
 
-PRIORITY = ["🔴 긴급", "🟡 보통", "🟢 일반"]
-STATUS_OPTIONS = ["📋 예정", "🔧 진행 중", "✅ 완료", "⏸️ 보류"]
-CATEGORIES = ["HVAC", "수영장", "Gym 장비", "전기", "배관", "청소", "기타"]
+import pandas as pd
+import streamlit as st
+
+from sheets_config import TASK_TRACKER_URL, MASTER_SHEET_URL
+from todo_store import load_todos, today
+from ui_links import link_buttons
+
+COLS = ["번호", "정기 ID", "할 일", "마감일", "상태", "비고"]
+
+
+def _fmt(df, cols=COLS):
+    v = df[cols].copy()
+    for c in ("마감일", "완료일"):
+        if c in v:
+            v[c] = v[c].map(lambda d: d.strftime("%Y-%m-%d") if d else "—")
+    return v
+
 
 def show():
     st.title("🗓️ 메인트넌스 일정")
+    st.caption("정기 업무는 '📅 정기 일정 마스터'에서 관리되고, 매월 25일 다음 달 회차가 할 일로 자동 생성됩니다.")
+    link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL), ("📊 설비·시설 대장", MASTER_SHEET_URL)])
 
-    # 바로가기
-    st.markdown("**🔗 관련 문서 바로가기**")
-    link_buttons([("📊 Master Status Sheet", MASTER_SHEET_URL),
-                  ("📋 할 일 관리표", TASK_TRACKER_URL),
-                  ("💬 Slack", SLACK_URL)])
-    st.markdown("---")
+    df = load_todos()
+    if df is None:
+        st.warning("⚠️ 할 일 관리표를 불러올 수 없습니다.")
+        return
+    pm = df[df["정기 ID"].str.strip() != ""].copy()
+    if pm.empty:
+        st.info("정기 ID가 지정된 할 일이 없습니다.")
+        return
 
-    if "maintenance_data" not in st.session_state:
-        today = date.today()
-        st.session_state.maintenance_data = [
-            {"작업명": "Gym HVAC 필터 교체",        "카테고리": "HVAC",    "담당": "FM 강성근",      "예정일": str(today + timedelta(days=4)),  "우선순위": "🔴 긴급", "상태": "📋 예정",    "비용($)": 350, "비고": ""},
-            {"작업명": "수영장 pH 체크 및 약품 투입","카테고리": "수영장",  "담당": "FM 강성근",      "예정일": str(today),                     "우선순위": "🔴 긴급", "상태": "🔧 진행 중", "비용($)": 120, "비고": "오늘 측정값 이상"},
-            {"작업명": "RTU 교체 공사 착공",         "카테고리": "HVAC",    "담당": "Johnstone Supply","예정일": str(today + timedelta(days=10)), "우선순위": "🟡 보통", "상태": "📋 예정",    "비용($)": 0,   "비고": "별도 계약"},
-            {"작업명": "수영장 제습기 교체",         "카테고리": "수영장",  "담당": "ADE Systems",    "예정일": str(today + timedelta(days=14)), "우선순위": "🟡 보통", "상태": "📋 예정",    "비용($)": 0,   "비고": "PO 발행 완료"},
-        ]
+    t = today()
+    month_start = t.replace(day=1)
+    has_due = pm["마감일"].notna()
+    done = pm["상태"] == "완료"
+    this_month = pm[has_due & pm["마감일"].map(lambda d: d is not None and d >= month_start and d.month == t.month)]
+    overdue = pm[has_due & ~done & pm["마감일"].map(lambda d: d is not None and d < t)]
+    upcoming = pm[has_due & ~done & pm["마감일"].map(lambda d: d is not None and t <= d <= t + timedelta(days=30))]
+    recent = pm[done & pm["완료일"].map(lambda d: d is not None and d >= t - timedelta(days=30))]
 
-    df = pd.DataFrame(st.session_state.maintenance_data)
+    tm_done = this_month[this_month["상태"] == "완료"]
+    on_time = [1 for _, r in tm_done.iterrows() if r["완료일"] is not None and r["완료일"] <= r["마감일"]]
+    m = st.columns(4)
+    m[0].metric("이번 달 정기 회차", f"{len(this_month)}건")
+    m[1].metric("이번 달 완료", f"{len(tm_done)}건")
+    m[2].metric("기한 준수율", f"{round(len(on_time) / len(tm_done) * 100) if len(tm_done) else 0}%")
+    m[3].metric("마감 초과", f"{len(overdue)}건", delta="확인" if len(overdue) else None, delta_color="inverse")
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("전체 작업", len(df))
-    c2.metric("🔴 긴급",   len(df[df["우선순위"] == "🔴 긴급"]))
-    c3.metric("🔧 진행 중",len(df[df["상태"] == "🔧 진행 중"]))
-    c4.metric("✅ 완료",   len(df[df["상태"] == "✅ 완료"]))
-    st.markdown("---")
+    if st.button("📲 현장 입력에서 완료 처리", type="primary", width="stretch"):
+        st.session_state.page = "field_input"
+        st.rerun()
 
-    col1, col2, col3 = st.columns(3)
-    with col1: f_cat      = st.selectbox("카테고리", ["전체"] + CATEGORIES)
-    with col2: f_priority = st.selectbox("우선순위", ["전체"] + PRIORITY)
-    with col3: f_status   = st.selectbox("상태",     ["전체"] + STATUS_OPTIONS)
+    for title, part in (("🔴 마감 초과", overdue), ("🟡 30일 내 예정", upcoming)):
+        st.subheader(title)
+        if part.empty:
+            st.caption("없음")
+        else:
+            st.dataframe(_fmt(part.sort_values("마감일")), width="stretch", hide_index=True)
+    with st.expander(f"✔️ 최근 30일 완료 ({len(recent)}건)"):
+        st.dataframe(_fmt(recent.sort_values("완료일", ascending=False),
+                          ["번호", "정기 ID", "할 일", "마감일", "완료일"]), width="stretch", hide_index=True)
 
-    fdf = df.copy()
-    if f_cat      != "전체": fdf = fdf[fdf["카테고리"] == f_cat]
-    if f_priority != "전체": fdf = fdf[fdf["우선순위"] == f_priority]
-    if f_status   != "전체": fdf = fdf[fdf["상태"] == f_status]
-    st.dataframe(fdf, width="stretch", hide_index=True)
-    st.markdown("---")
-
-    tab1, tab2 = st.tabs(["✏️ 상태 업데이트", "➕ 작업 추가"])
-
-    with tab1:
-        with st.form("maint_update"):
-            task_names = [m["작업명"] for m in st.session_state.maintenance_data]
-            selected   = st.selectbox("작업 선택", task_names)
-            col_a, col_b = st.columns(2)
-            with col_a:
-                new_status = st.selectbox("상태 변경", STATUS_OPTIONS)
-                new_date   = st.date_input("예정일 변경")
-            with col_b:
-                new_cost = st.number_input("실제 비용 ($)", min_value=0, step=50)
-                note     = st.text_input("비고")
-            if st.form_submit_button("업데이트", type="primary", width="stretch"):
-                for item in st.session_state.maintenance_data:
-                    if item["작업명"] == selected:
-                        item["상태"] = new_status
-                        item["예정일"] = str(new_date)
-                        if new_cost > 0: item["비용($)"] = new_cost
-                        if note: item["비고"] = note
-                try:
-                    from sheets_helper import append_row, save_indicator
-                    row = [str(date.today()), selected, new_status, str(new_date), new_cost, note]
-                    ok = append_row("메인트넌스", row)
-                    save_indicator(ok, selected)
-                except Exception:
-                    st.warning("⚠️ Sheets 미연결 — 세션에만 저장됨")
-                st.rerun()
-
-    with tab2:
-        with st.form("maint_add"):
-            col_a, col_b = st.columns(2)
-            with col_a:
-                name      = st.text_input("작업명")
-                category  = st.selectbox("카테고리", CATEGORIES)
-                assignee  = st.text_input("담당자", value="FM 강성근")
-            with col_b:
-                priority  = st.selectbox("우선순위", PRIORITY)
-                plan_date = st.date_input("예정일")
-                cost      = st.number_input("예상 비용 ($)", min_value=0, step=50)
-            note = st.text_input("비고")
-            if st.form_submit_button("추가", type="primary", width="stretch"):
-                if name:
-                    new_item = {
-                        "작업명": name, "카테고리": category, "담당": assignee,
-                        "예정일": str(plan_date), "우선순위": priority,
-                        "상태": "📋 예정", "비용($)": cost, "비고": note
-                    }
-                    st.session_state.maintenance_data.append(new_item)
-                    try:
-                        from sheets_helper import append_row, save_indicator
-                        row = [str(date.today()), name, category, assignee,
-                               str(plan_date), priority, "📋 예정", cost, note]
-                        ok = append_row("메인트넌스", row)
-                        save_indicator(ok, name)
-                    except Exception:
-                        st.warning("⚠️ Sheets 미연결 — 세션에만 저장됨")
-                    st.rerun()
+    with st.expander("📈 정기 업무별 회차 (전체 기간)"):
+        g = pm.groupby("정기 ID").agg(회차=("번호", "count"),
+                                     완료=("상태", lambda s: int((s == "완료").sum()))).reset_index()
+        st.dataframe(g.sort_values("정기 ID"), width="stretch", hide_index=True)

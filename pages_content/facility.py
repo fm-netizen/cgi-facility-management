@@ -1,74 +1,80 @@
 import streamlit as st
-from ui_links import link_buttons
-from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
-import pandas as pd
-from datetime import date
 
-ZONES = ["수영장", "Gym", "로커룸 (남)", "로커룸 (여)", "사무실", "공용 복도", "기계실"]
-STATUS_OPTIONS = ["🟢 정상", "🟡 점검 필요", "🔴 이상 발생", "🔧 수리 중"]
+import asset_store as A
+from pages_content.field_input import _check_pin
+from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL
+from ui_links import link_buttons
+
+VIEW = ["구역ID", "구역명", "현재 상태", "최근 기록", "온도(°F)", "습도(%)", "최근 비고", "관련 할 일#"]
+
+
+def _author():
+    a = st.text_input("기록자", value=st.session_state.get("me") or st.session_state.get("author", ""),
+                      placeholder="예: SeungOh Suh").strip()
+    st.session_state.author = a
+    return a
+
 
 def show():
     st.title("🏢 시설 상황")
-
-    # 상단 바로가기
-    st.markdown("**🔗 관련 문서 바로가기**")
-    link_buttons([("📊 Master Status Sheet", MASTER_SHEET_URL),
+    link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
                   ("📋 할 일 관리표", TASK_TRACKER_URL),
-                  ("📁 Google Drive", DRIVE_FOLDER_URL)])
+                  ("📁 공사 폴더", DRIVE_FOLDER_URL)])
+
+    data = A.load_assets()
+    if data is None:
+        st.warning("⚠️ 설비·시설 대장을 불러올 수 없습니다. " + st.session_state.get("asset_error", ""))
+        return
+    zones = data["zones"]
+    c = A.counts(zones)
+    m = st.columns(5)
+    m[0].metric("전체 구역", c["전체"])
+    m[1].metric("🟢 정상", c["🟢 정상"])
+    m[2].metric("🟡 점검 필요", c["🟡 점검 필요"])
+    m[3].metric("🔧 수리·공사 중", c["🔧 수리·공사 중"])
+    m[4].metric("🔴 고장·이상", c["🔴 고장·이상"])
+
+    f = st.selectbox("상태 필터", ["전체", "정상 아님"] + A.STATUSES)
+    view = zones
+    if f == "정상 아님":
+        view = zones[zones["현재 상태"] != A.NORMAL]
+    elif f != "전체":
+        view = zones[zones["현재 상태"] == f]
+    st.dataframe(view[VIEW], width="stretch", hide_index=True)
+
     st.markdown("---")
+    st.subheader("✏️ 상태 기록")
+    st.caption("기록은 '📝 상태 기록' 탭에 한 줄씩 쌓이고, 표는 가장 최근 기록을 보여줍니다.")
+    if not _check_pin():
+        return
+    labels = [f"{r['구역ID']} · {r['구역명']}" for _, r in zones.iterrows()]
+    if not labels:
+        st.info("구역이 없습니다. 대장의 '🏢 시설 구역' 탭에 먼저 등록하세요.")
+        return
+    author = _author()
+    pick = st.selectbox("구역", labels)
+    zid = pick.split(" · ")[0]
+    cur = zones.set_index("구역ID")["현재 상태"].get(zid, A.NORMAL)
+    st.caption(f"현재: {cur}")
+    with st.form("zone_status", clear_on_submit=True):
+        status = st.selectbox("상태", A.STATUSES,
+                              index=A.STATUSES.index(cur) if cur in A.STATUSES else 0)
+        col1, col2, col3 = st.columns(3)
+        temp = col1.text_input("온도 (°F)", placeholder="예: 82")
+        hum = col2.text_input("습도 (%)", placeholder="예: 55")
+        ref = col3.text_input("관련 할 일#/WO#", placeholder="선택")
+        note = st.text_area("비고", placeholder="점검 결과·특이사항")
+        if st.form_submit_button("기록", type="primary", width="stretch"):
+            if not author:
+                st.error("기록자 이름을 입력하세요.")
+            else:
+                ok, msg = A.add_status("시설", zid, status, note, author, temp, hum, ref)
+                (st.success if ok else st.error)(msg)
 
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        filter_status = st.selectbox("상태 필터", ["전체"] + STATUS_OPTIONS)
-    with col_f2:
-        filter_zone = st.selectbox("구역 필터", ["전체"] + ZONES)
-
-    st.markdown("---")
-
-    if "facility_data" not in st.session_state:
-        st.session_state.facility_data = [
-            {"구역": "수영장",    "상태": "🟢 정상",    "온도": "82°F", "습도": "55%", "비고": "제습기 교체 예정"},
-            {"구역": "Gym",       "상태": "🟡 점검 필요","온도": "70°F", "습도": "45%", "비고": "HVAC 필터 교체 필요"},
-            {"구역": "로커룸 (남)","상태": "🟢 정상",   "온도": "72°F", "습도": "50%", "비고": ""},
-            {"구역": "로커룸 (여)","상태": "🟢 정상",   "온도": "72°F", "습도": "50%", "비고": ""},
-            {"구역": "사무실",    "상태": "🟢 정상",    "온도": "71°F", "습도": "48%", "비고": ""},
-            {"구역": "공용 복도", "상태": "🟢 정상",    "온도": "70°F", "습도": "47%", "비고": ""},
-            {"구역": "기계실",    "상태": "🔧 수리 중", "온도": "75°F", "습도": "52%", "비고": "RTU 교체 진행 중"},
-        ]
-
-    df = pd.DataFrame(st.session_state.facility_data)
-    if filter_status != "전체": df = df[df["상태"] == filter_status]
-    if filter_zone   != "전체": df = df[df["구역"] == filter_zone]
-    st.dataframe(df, width="stretch", hide_index=True)
-    st.markdown("---")
-
-    st.subheader("✏️ 상태 업데이트")
-    with st.form("facility_update_form"):
-        col1, col2 = st.columns(2)
-        with col1:
-            zone     = st.selectbox("구역", ZONES)
-            status   = st.selectbox("상태", STATUS_OPTIONS)
-        with col2:
-            temp     = st.text_input("온도 (°F)", placeholder="예: 72")
-            humidity = st.text_input("습도 (%)",  placeholder="예: 50")
-        note = st.text_area("비고", placeholder="특이사항 입력")
-        submitted = st.form_submit_button("업데이트", type="primary", width="stretch")
-
-        if submitted:
-            for item in st.session_state.facility_data:
-                if item["구역"] == zone:
-                    item["상태"] = status
-                    if temp:     item["온도"] = f"{temp}°F"
-                    if humidity: item["습도"] = f"{humidity}%"
-                    item["비고"] = note
-
-            # Sheets 저장
-            try:
-                from sheets_helper import append_row, save_indicator
-                row = [str(date.today()), zone, status,
-                       f"{temp}°F" if temp else "", f"{humidity}%" if humidity else "", note]
-                ok = append_row("시설 상황", row)
-                save_indicator(ok, zone)
-            except Exception:
-                st.warning("⚠️ Sheets 미연결 — 세션에만 저장됨")
-            st.rerun()
+    with st.expander("🕘 구역별 기록 이력"):
+        hz = st.selectbox("구역 선택", labels, key="zone_hist").split(" · ")[0]
+        h = A.load_history(hz)
+        if h is None or h.empty:
+            st.caption("기록 없음")
+        else:
+            st.dataframe(h, width="stretch", hide_index=True)

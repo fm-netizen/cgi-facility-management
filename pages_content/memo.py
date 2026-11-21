@@ -1,82 +1,104 @@
-import streamlit as st
-from ui_links import link_buttons
-from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL
-from datetime import datetime, date
+"""메모 — 할 일 관리표 '📝 메모' 탭에 저장 (삭제는 '삭제' 표시로 숨김, 기록 보존)."""
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-TAGS = ["일반", "긴급", "HVAC", "수영장", "Gym", "전기", "배관", "Vendor", "CEO 보고"]
+import pandas as pd
+import streamlit as st
+
+from sheets_config import TODO_SPREADSHEET_ID, MEMO_SHEET_NAME, TASK_TRACKER_URL, SLACK_URL
+from ui_links import link_buttons
+import voice
+
+TZ = ZoneInfo("America/New_York")
+COLS = ["등록일시", "제목", "태그", "내용", "상태", "작성자"]
+TAGS = ["일반", "긴급", "HVAC", "수영장", "Gym", "전기", "배관", "Vendor", "CEO 보고", "공사"]
+TAG_ICON = {"긴급": "🔴", "CEO 보고": "🟣", "HVAC": "🔵", "수영장": "🌊", "Gym": "💪", "공사": "🏗"}
+
+
+def _ws():
+    from sheets_helper import get_sheets_client
+    c = get_sheets_client()
+    return None if c is None else c.open_by_key(TODO_SPREADSHEET_ID).worksheet(MEMO_SHEET_NAME)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_memos():
+    try:
+        ws = _ws()
+        if ws is None:
+            return None
+        values = ws.get_all_values()
+    except Exception as e:
+        st.session_state["memo_error"] = str(e)
+        return None
+    rows = []
+    for i, r in enumerate(values[1:], start=2):
+        r = (list(r) + [""] * 6)[:6]
+        if r[1].strip() and r[4] != "삭제":
+            rows.append(dict(zip(COLS, r), _row=i))
+    return pd.DataFrame(rows, columns=COLS + ["_row"]).iloc[::-1]
+
+
+def _set_status(row, status):
+    ws = _ws()
+    ws.update(range_name=f"E{row}", values=[[status]], value_input_option="USER_ENTERED")
+    load_memos.clear()
+
 
 def show():
     st.title("📝 메모")
+    link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL), ("💬 Slack", SLACK_URL)])
 
-    # 바로가기
-    st.markdown("**🔗 관련 문서 바로가기**")
-    link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL),
-                  ("💬 Slack", SLACK_URL),
-                  ("📁 Google Drive", DRIVE_FOLDER_URL)])
-    st.markdown("---")
+    df = load_memos()
+    if df is None:
+        st.warning("⚠️ 메모 탭을 불러올 수 없습니다. " + st.session_state.get("memo_error", ""))
+        return
 
-    if "memos" not in st.session_state:
-        st.session_state.memos = [
-            {"제목": "RTU 교체 Johnstone 담당자 연락처", "내용": "담당: Mike Johnson / 201-555-0192\n견적 유효기간: 2026-07-31", "태그": "HVAC",    "작성일": "2026-06-10 09:00", "완료": False},
-            {"제목": "ADE Systems 설치 일정 확인 필요",  "내용": "PO 발행 완료. 설치 날짜 확정 요청.",                          "태그": "수영장",   "작성일": "2026-06-15 14:30", "완료": False},
-            {"제목": "CEO 보고 — 6월 격주 미팅",         "내용": "RTU, 제습기, Gym 장비 현황 보고 준비.",                        "태그": "CEO 보고", "작성일": "2026-06-18 10:00", "완료": False},
-        ]
-
-    # 새 메모
-    with st.expander("➕ 새 메모 작성", expanded=False):
-        with st.form("memo_form"):
-            col1, col2 = st.columns([3, 1])
-            with col1: title = st.text_input("제목")
-            with col2: tag   = st.selectbox("태그", TAGS)
-            content = st.text_area("내용", height=100)
+    with st.expander("➕ 새 메모", expanded=False):
+        spoken = voice.voice_box("memo_voice", "🎤 말로 메모")
+        with st.form(f"memo_form_{st.session_state.get('memo_voice_n', 0)}", clear_on_submit=True):
+            c1, c2 = st.columns([3, 1])
+            title = c1.text_input("제목")
+            tag = c2.selectbox("태그", TAGS)
+            content = st.text_area("내용", value=spoken, height=100,
+                                   key=f"memo_c_{st.session_state.get('memo_voice_n', 0)}_{len(spoken)}")
+            author = st.text_input("작성자", value=st.session_state.get("me") or st.session_state.get("author", ""))
             if st.form_submit_button("저장", type="primary", width="stretch"):
-                if title:
-                    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-                    st.session_state.memos.insert(0, {
-                        "제목": title, "내용": content, "태그": tag,
-                        "작성일": now, "완료": False
-                    })
+                if not title.strip():
+                    st.error("제목을 입력하세요.")
+                else:
                     try:
-                        from sheets_helper import append_row, save_indicator
-                        row = [str(date.today()), now, title, tag, content, "미완료"]
-                        ok = append_row("메모", row)
-                        save_indicator(ok, title)
-                    except Exception:
-                        st.warning("⚠️ Sheets 미연결 — 세션에만 저장됨")
-                    st.rerun()
+                        now = datetime.now(TZ).strftime("%Y-%m-%d %H:%M")
+                        _ws().append_row([now, title.strip(), tag, content.strip(), "미완료", author.strip()],
+                                         value_input_option="USER_ENTERED", table_range="A1:F1")
+                        load_memos.clear()
+                        voice.clear("memo_voice")
+                        st.success("저장 완료")
+                    except Exception as e:
+                        st.error(f"저장 실패: {e}")
 
+    c1, c2 = st.columns(2)
+    f_tag = c1.selectbox("태그 필터", ["전체"] + TAGS)
+    f_done = c2.selectbox("완료 여부", ["미완료", "완료", "전체"])
+    view = df
+    if f_tag != "전체":
+        view = view[view["태그"] == f_tag]
+    if f_done != "전체":
+        view = view[view["상태"] == f_done]
+    st.markdown(f"**{len(view)}개** 메모")
     st.markdown("---")
 
-    col1, col2 = st.columns(2)
-    with col1: f_tag  = st.selectbox("태그 필터", ["전체"] + TAGS)
-    with col2: f_done = st.selectbox("완료 여부", ["전체", "미완료", "완료"])
-
-    memos = st.session_state.memos
-    if f_tag  != "전체":   memos = [m for m in memos if m["태그"] == f_tag]
-    if f_done == "미완료": memos = [m for m in memos if not m["완료"]]
-    elif f_done == "완료": memos = [m for m in memos if m["완료"]]
-
-    st.markdown(f"**{len(memos)}개** 메모")
-    st.markdown("---")
-
-    tag_icons = {"긴급": "🔴", "CEO 보고": "🟣", "HVAC": "🔵", "수영장": "🌊", "Gym": "💪"}
-
-    for memo in memos:
-        orig_idx = st.session_state.memos.index(memo)
-        icon = "✅" if memo["완료"] else "📋"
-        tag_icon = tag_icons.get(memo["태그"], "⚪")
-
-        col_title, col_btn1, col_btn2 = st.columns([6, 1, 1])
-        with col_title:
-            st.markdown(f"**{icon} {memo['제목']}** &nbsp; {tag_icon} `{memo['태그']}` &nbsp; *{memo['작성일']}*")
-        with col_btn1:
-            if st.button("완료" if not memo["완료"] else "미완료", key=f"done_{orig_idx}", width="stretch"):
-                st.session_state.memos[orig_idx]["완료"] = not memo["완료"]
-                st.rerun()
-        with col_btn2:
-            if st.button("삭제", key=f"del_{orig_idx}", width="stretch"):
-                st.session_state.memos.pop(orig_idx)
-                st.rerun()
-        if memo["내용"]:
-            st.caption(memo["내용"])
+    for _, m in view.iterrows():
+        icon = "✅" if m["상태"] == "완료" else "📋"
+        a, b, c = st.columns([6, 1, 1])
+        a.markdown(f"**{icon} {m['제목']}** &nbsp; {TAG_ICON.get(m['태그'], '⚪')} `{m['태그']}` "
+                   f"&nbsp; *{m['등록일시']} · {m['작성자']}*")
+        if b.button("미완료" if m["상태"] == "완료" else "완료", key=f"done_{m['_row']}", width="stretch"):
+            _set_status(m["_row"], "미완료" if m["상태"] == "완료" else "완료")
+            st.rerun()
+        if c.button("삭제", key=f"del_{m['_row']}", width="stretch"):
+            _set_status(m["_row"], "삭제")
+            st.rerun()
+        if m["내용"]:
+            st.caption(m["내용"])
         st.markdown("---")
