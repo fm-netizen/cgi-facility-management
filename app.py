@@ -52,13 +52,18 @@ if _is_mgr(_role):
 if "page" not in st.session_state:
     st.session_state.page = "today"
 
+def _go(target):
+    st.session_state.page = target      # 콜백: 화면을 그리기 전에 페이지 변경 → 버튼 강조가 즉시 일치
+
+
 for label, key in pages.items():
-    if st.sidebar.button(
+    st.sidebar.button(
         label,
+        key=f"nav_{key}",
         width="stretch",
-        type="primary" if st.session_state.page == key else "secondary"
-    ):
-        st.session_state.page = key
+        type="primary" if st.session_state.page == key else "secondary",
+        on_click=_go, args=(key,),
+    )
 
 st.sidebar.markdown("---")
 
@@ -102,7 +107,7 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.5.0 · 2026")
+st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.5.1 · 2026")
 
 # ── Page Router ──────────────────────────────────────────────
 page = st.session_state.page
