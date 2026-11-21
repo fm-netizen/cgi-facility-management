@@ -24,17 +24,33 @@ st.sidebar.markdown("---")
 # Navigation
 st.sidebar.markdown("**📋 메뉴**")
 pages = {
-    "🏠 홈 (대시보드)":   "home",
+    "🗓 오늘":             "today",
+    "🚨 접수":             "report",
     "🎫 작업 티켓":       "work_orders",
     "📲 현장 입력":       "field_input",
-    "🏢 시설 상황":        "facility",
     "⚙️ 설비 상황":        "equipment",
+    "🏢 시설 상황":        "facility",
     "🗓️ 메인트넌스 일정":  "maintenance",
     "📝 메모":             "memo",
 }
+MANAGER_PAGES = {"🏠 팀장 대시보드": "home"}
+
+# 역할 판별 (👷 작업자 탭의 '역할'이 팀장이면 관리자 메뉴)
+_role = ""
+try:
+    from user_ctx import workers as _workers, is_manager as _is_mgr
+    _me = st.session_state.get("me") or st.query_params.get("me")
+    _w = _workers()
+    if _me and _w is not None and _me in _w["이름"].tolist():
+        _role = _w.set_index("이름")["역할"].get(_me, "")
+        st.sidebar.caption(f"👤 {_me} · {_role or '작업자'}")
+except Exception:
+    _is_mgr = lambda r: False
+if _is_mgr(_role):
+    pages = {**MANAGER_PAGES, **pages}
 
 if "page" not in st.session_state:
-    st.session_state.page = "home"
+    st.session_state.page = "today"
 
 for label, key in pages.items():
     if st.sidebar.button(
@@ -86,12 +102,16 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.3.2 · 2026")
+st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.5.0 · 2026")
 
 # ── Page Router ──────────────────────────────────────────────
 page = st.session_state.page
 
-if page == "home":
+if page == "today":
+    from pages_content import today; today.show()
+elif page == "report":
+    from pages_content import report; report.show()
+elif page == "home":
     from pages_content import home; home.show()
 elif page == "work_orders":
     from pages_content import work_orders; work_orders.show()

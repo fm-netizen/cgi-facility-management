@@ -11,7 +11,9 @@ TZ = ZoneInfo("America/New_York")
 HEADER_ROW = 5            # 시트의 헤더 행 번호 (1-based)
 FIRST_DATA_ROW = 6
 COLUMNS = ["번호", "프로젝트/구분", "할 일", "분류", "우선순위",
-           "등록일", "마감일", "완료일", "상태", "출처", "비고"]
+           "등록일", "마감일", "완료일", "상태", "출처", "비고", "정기 ID",
+           "WO 인시", "처리일수", "기한 준수", "담당자", "긴급도", "구역·설비 ID"]
+URGENCY = ["P1 즉시", "P2 당일", "P3 이번 주", "P4 계획"]
 
 GROUPS = ["시설 운영", "공사 (RTU·제습기)", "공사 (Gym)", "행정(일반)",
           "행정(인스펙션)", "하우스", "BR 지역", "기타"]
@@ -90,7 +92,8 @@ def _fmt(d):
     return d.strftime("%Y-%m-%d") if d else ""
 
 
-def add_todo(group, task, category, priority, due, status, note, author):
+def add_todo(group, task, category, priority, due, status, note, author,
+             assignee="", urgency="", asset="", source="직접 입력"):
     """다음 빈 행(번호만 있는 행 포함)에 할 일 추가. (성공여부, 메시지)"""
     try:
         ws = _worksheet()
@@ -112,9 +115,10 @@ def add_todo(group, task, category, priority, due, status, note, author):
         t = today()
         note_text = f"[현장입력·{author}] {note}".strip() if author else note
         row = [number, group, task, category, priority, _fmt(t), _fmt(due),
-               _fmt(t) if status == "완료" else "", status, "직접 입력", note_text]
-        ws.update(range_name=f"A{target}:K{target}", values=[row],
-                  value_input_option="USER_ENTERED")
+               _fmt(t) if status == "완료" else "", status, source, note_text]
+        ws.batch_update([{"range": f"A{target}:K{target}", "values": [row]},
+                         {"range": f"P{target}:R{target}", "values": [[assignee, urgency, asset]]}],
+                        value_input_option="USER_ENTERED")
         load_todos.clear()
         return True, f"#{number} 등록 완료"
     except Exception as e:
@@ -138,5 +142,23 @@ def update_status(sheet_row, new_status, note, author, current_note=""):
                       value_input_option="USER_ENTERED")
         load_todos.clear()
         return True, "상태 변경 완료"
+    except Exception as e:
+        return False, f"저장 실패: {e}"
+
+
+def set_assignee(sheet_row, name, note="", author="", current_note=""):
+    """담당자 지정/변경 (P열). 메모는 비고에 덧붙임."""
+    try:
+        ws = _worksheet()
+        if ws is None:
+            return False, "Sheets 미연결"
+        ws.update(range_name=f"P{sheet_row}", values=[[name]], value_input_option="USER_ENTERED")
+        if note.strip():
+            t = today()
+            tag = f"{t.month}/{t.day} {author}: " if author else f"{t.month}/{t.day}: "
+            merged = f"{current_note} / {tag}{note.strip()}" if current_note else f"{tag}{note.strip()}"
+            ws.update(range_name=f"K{sheet_row}", values=[[merged]], value_input_option="USER_ENTERED")
+        load_todos.clear()
+        return True, f"담당: {name}"
     except Exception as e:
         return False, f"저장 실패: {e}"
