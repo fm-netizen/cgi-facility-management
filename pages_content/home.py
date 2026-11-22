@@ -57,7 +57,7 @@ def show():
     link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
                   ("📋 할 일 관리표", TASK_TRACKER_URL),
                   ("📁 공사 폴더", DRIVE_FOLDER_URL),
-                  ("💬 Slack #cgi-facility-dev", SLACK_URL)])
+                  ("💬 Slack #fm-team", SLACK_URL)])
     with st.expander("📁 공사 프로젝트 폴더"):
         for name, links in PROJECT_FOLDERS.items():
             st.markdown(f"**{name}**")
