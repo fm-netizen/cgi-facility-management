@@ -120,15 +120,14 @@ def show():
                 msgs.append(ws.start_work(wo_no, me))
         sent = notify.slack_team(f"🚨 {title}\n📍 {where or '-'}\n✋ {me} " +
                                  ("처리 완료(사후 기록)" if after else "처리 중"))
-        msgs.append((True, "💬 팀 Slack 알림 전송" if sent else "💬 Slack 미설정 — 알림 생략"))
+        msgs.append((sent, notify.result_msg(sent)))
     else:
         ok, msg = add_todo(group, what.strip()[:80], "시설", "높음" if urgency.startswith(("P1", "P2")) else "보통",
                            None, "진행 전", note + " [팀장 요청]", "", assignee="", urgency=urgency,
                            asset=asset_ref, source="긴급 접수")
         msgs.append((ok, msg + " · 팀장 배정 대기"))
-        res = notify.call_lead(title, f"{what.strip()}\n📍 {where or '-'}\n접수: {me} ({msg})",
-                               urgent=urgency.startswith("P1"))
-        msgs.append((res["push"] or res["slack"], notify.status_line(res)))
+        sent = notify.call_lead(title, f"{what.strip()}\n📍 {where or '-'}\n접수: {me} ({msg})")
+        msgs.append((sent, notify.result_msg(sent)))
 
     if eid and urgency.startswith(("P1", "P2")) and not after:
         msgs.append(A.add_status("설비", eid, "🔴 고장·이상", what.strip(), me))
