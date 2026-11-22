@@ -18,7 +18,8 @@ def show(embedded=False):
 
     data = A.load_assets()
     if data is None:
-        st.warning("⚠️ 설비·시설 대장을 불러올 수 없습니다. " + st.session_state.get("asset_error", ""))
+        st.warning("⚠️ 설비·시설 대장을 불러올 수 없습니다. 시트가 서비스 계정(fm-assistant)에 편집자로 공유되어 있는지 확인하세요. "
+                   + st.session_state.get("asset_error", ""))
         return
     eq, zones = data["equip"], data["zones"]
     c = A.counts(eq)

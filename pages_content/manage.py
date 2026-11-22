@@ -4,21 +4,19 @@ import streamlit as st
 from pages_content import home, maintenance, today
 from pages_content import work_orders as wop
 from pages_content.field_input import _check_pin
-from sheets_config import MASTER_SHEET_URL, TASK_TRACKER_URL, DRIVE_FOLDER_URL, SLACK_URL, PROJECT_FOLDERS
+from sheets_config import PROJECT_FOLDERS
 from ui_links import link_buttons
 from user_ctx import current_user, is_manager
 
 
 def show():
-    st.title("📊 관리")
+    st.title("📊 관리 (팀장 전용)")
     if not _check_pin():
         return
     me, role = current_user(show_picker=False)
     if not is_manager(role):
         st.warning("팀장 전용 화면입니다.")
         return
-    link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL), ("📋 할 일 관리표", TASK_TRACKER_URL),
-                  ("📁 공사 폴더", DRIVE_FOLDER_URL), ("💬 Slack #fm-team", SLACK_URL)])
     t1, t2, t3, t4 = st.tabs(["📊 대시보드", "👥 팀 현황", "🎫 작업 티켓·검수", "🗓️ 정기 업무"])
     with t1:
         home.show(embedded=True)

@@ -55,15 +55,16 @@ def show(embedded=False):
         st.title("🏠 CGI Facility Management")
         st.caption(f"111 Homans Ave, Closter, NJ · {t.strftime('%Y년 %m월 %d일')}")
 
-    link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
-                  ("📋 할 일 관리표", TASK_TRACKER_URL),
-                  ("📁 공사 폴더", DRIVE_FOLDER_URL),
-                  ("💬 Slack #fm-team", SLACK_URL)])
-    with st.expander("📁 공사 프로젝트 폴더"):
-        for name, links in PROJECT_FOLDERS.items():
-            st.markdown(f"**{name}**")
-            link_buttons(links)
-    st.markdown("---")
+    if not embedded:
+        link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
+                      ("📋 할 일 관리표", TASK_TRACKER_URL),
+                      ("📁 공사 폴더", DRIVE_FOLDER_URL),
+                      ("💬 Slack #fm-team", SLACK_URL)])
+        with st.expander("📁 공사 프로젝트 폴더"):
+            for name, links in PROJECT_FOLDERS.items():
+                st.markdown(f"**{name}**")
+                link_buttons(links)
+        st.markdown("---")
     _asset_strip()
     st.markdown("---")
 
