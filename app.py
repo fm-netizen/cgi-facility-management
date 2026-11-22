@@ -107,7 +107,7 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.5.1 · 2026")
+st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.5.3 · 2026")
 
 # ── Page Router ──────────────────────────────────────────────
 page = st.session_state.page
