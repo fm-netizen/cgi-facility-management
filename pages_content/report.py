@@ -1,4 +1,7 @@
 """🚨 긴급·불시 접수 — 누구나 접수 → '내가 처리' 또는 '팀장 요청'."""
+import re
+import time
+
 import streamlit as st
 
 import asset_store as A
@@ -6,7 +9,7 @@ import notify
 import voice
 import wo_store as ws
 from pages_content.field_input import _check_pin
-from todo_store import add_todo, GROUPS, URGENCY
+from todo_store import add_todo, load_todos, today, GROUPS, URGENCY
 from user_ctx import current_user
 
 VKEY = "rep_voice"
@@ -64,6 +67,34 @@ def show():
     if not what.strip():
         st.error("내용을 입력하세요.")
         return
+    # 설비를 고르지 않았어도 내용에 설비 ID(예: LD-01)가 있으면 자동 연결
+    if not eid and equip is not None:
+        ids = set(equip["설비ID"])
+        hit = next((m for m in re.findall(r"[A-Z]{2}-\d{2}", what.upper()) if m in ids), "")
+        if hit:
+            eid = hit
+            row = equip.set_index("설비ID").loc[hit]
+            epick = f"{hit} · {row['설비명']}"
+            if not zid:
+                zid = row["구역ID"]
+                zname = zones.set_index("구역ID")["구역명"].get(zid, "") if zones is not None else ""
+                zpick = f"{zid} · {zname}"
+
+    # 중복 접수 방지: 같은 내용을 2분 안에 다시 누르거나, 오늘 같은 내용이 이미 미완료로 있으면 저장하지 않음
+    sig = (what.strip(), urgency, zid, eid, "mine" if mine else "lead")
+    last = st.session_state.get("rep_last")
+    if last and last[0] == sig and time.time() - last[1] < 120:
+        st.warning("방금 같은 내용이 이미 접수되었습니다. 중복 저장하지 않았습니다.")
+        return
+    df = load_todos()
+    if df is not None:
+        dup = df[(df["할 일"].str.strip() == what.strip()[:80]) & (df["출처"] == "긴급 접수")
+                 & (df["등록일"] == today()) & (df["상태"] != "완료")]
+        if not dup.empty:
+            st.warning(f"오늘 같은 내용이 이미 #{dup.iloc[0]['번호']}로 접수되어 있습니다. 중복 저장하지 않았습니다.")
+            return
+    st.session_state.rep_last = (sig, time.time())
+
     where = " / ".join(x for x in (zpick if zid else "", epick if eid else "") if x)
     title = f"[{urgency.split()[0]}] {what.strip()[:60]}"
     note = f"[접수·{me}] {what.strip()}" + (f" (위치: {where})" if where else "") + \
