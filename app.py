@@ -24,16 +24,15 @@ st.sidebar.markdown("---")
 # Navigation
 st.sidebar.markdown("**📋 메뉴**")
 pages = {
-    "🗓 오늘":             "today",
-    "🚨 접수":             "report",
-    "🎫 작업 티켓":       "work_orders",
-    "📲 현장 입력":       "field_input",
-    "⚙️ 설비 상황":        "equipment",
-    "🏢 시설 상황":        "facility",
-    "🗓️ 메인트넌스 일정":  "maintenance",
-    "📝 메모":             "memo",
+    "🗓 오늘":   "today",
+    "➕ 등록":   "register",
+    "🏢 현황":   "status",
 }
-MANAGER_PAGES = {"🏠 팀장 대시보드": "home"}
+MANAGER_PAGES = {"📊 관리": "manage"}
+# 예전 화면 이름 → 새 화면 (버튼·링크 호환)
+ALIASES = {"report": "register", "field_input": "register", "memo": "register",
+           "equipment": "status", "facility": "status",
+           "home": "manage", "work_orders": "manage", "maintenance": "manage"}
 
 # 역할 판별 (👷 작업자 탭의 '역할'이 팀장이면 관리자 메뉴)
 _role = ""
@@ -47,10 +46,11 @@ try:
 except Exception:
     _is_mgr = lambda r: False
 if _is_mgr(_role):
-    pages = {**MANAGER_PAGES, **pages}
+    pages = {**pages, **MANAGER_PAGES}
 
 if "page" not in st.session_state:
     st.session_state.page = "today"
+st.session_state.page = ALIASES.get(st.session_state.page, st.session_state.page)
 
 def _go(target):
     st.session_state.page = target      # 콜백: 화면을 그리기 전에 페이지 변경 → 버튼 강조가 즉시 일치
@@ -107,26 +107,16 @@ st.sidebar.markdown(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.5.5 · 2026")
+st.sidebar.caption("CGI Holistic Fitness & Spa\n111 Homans Ave, Closter, NJ\nv1.6.0 · 2026")
 
 # ── Page Router ──────────────────────────────────────────────
 page = st.session_state.page
 
-if page == "today":
+if page == "register":
+    from pages_content import register; register.show()
+elif page == "status":
+    from pages_content import status; status.show()
+elif page == "manage":
+    from pages_content import manage; manage.show()
+else:
     from pages_content import today; today.show()
-elif page == "report":
-    from pages_content import report; report.show()
-elif page == "home":
-    from pages_content import home; home.show()
-elif page == "work_orders":
-    from pages_content import work_orders; work_orders.show()
-elif page == "field_input":
-    from pages_content import field_input; field_input.show()
-elif page == "facility":
-    from pages_content import facility; facility.show()
-elif page == "equipment":
-    from pages_content import equipment; equipment.show()
-elif page == "maintenance":
-    from pages_content import maintenance; maintenance.show()
-elif page == "memo":
-    from pages_content import memo; memo.show()
