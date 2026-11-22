@@ -10,10 +10,11 @@ VIEW = ["설비ID", "설비명", "카테고리", "구역ID", "현재 상태", "�
         "담당", "관련 할 일#"]
 
 
-def show():
-    st.title("⚙️ 설비 상황")
-    link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
-                  ("📋 할 일 관리표", TASK_TRACKER_URL)])
+def show(embedded=False):
+    if not embedded:
+        st.title("⚙️ 설비 상황")
+        link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
+                      ("📋 할 일 관리표", TASK_TRACKER_URL)])
 
     data = A.load_assets()
     if data is None:
@@ -29,7 +30,7 @@ def show():
     m[4].metric("🔄 교체 예정", c["🔄 교체 예정"])
 
     f1, f2, f3 = st.columns(3)
-    fs = f1.selectbox("상태", ["전체", "정상 아님"] + A.STATUSES)
+    fs = f1.selectbox("상태", ["전체", "정상 아님"] + A.STATUSES, key="eq_fs")
     fc = f2.selectbox("카테고리", ["전체"] + sorted(eq["카테고리"].replace("", "기타").unique().tolist()))
     fz = f3.selectbox("구역", ["전체"] + zones["구역ID"].tolist())
     view = eq
@@ -44,7 +45,7 @@ def show():
     st.dataframe(view[VIEW], width="stretch", hide_index=True)
 
     st.markdown("---")
-    if not _check_pin():
+    if not embedded and not _check_pin():
         return
     author = st.text_input("기록자", value=st.session_state.get("me") or st.session_state.get("author", ""),
                            placeholder="예: Jay Choi").strip()

@@ -49,10 +49,11 @@ def _asset_strip():
         st.rerun()
 
 
-def show():
+def show(embedded=False):
     t = today()
-    st.title("🏠 CGI Facility Management")
-    st.caption(f"111 Homans Ave, Closter, NJ · {t.strftime('%Y년 %m월 %d일')}")
+    if not embedded:
+        st.title("🏠 CGI Facility Management")
+        st.caption(f"111 Homans Ave, Closter, NJ · {t.strftime('%Y년 %m월 %d일')}")
 
     link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
                   ("📋 할 일 관리표", TASK_TRACKER_URL),
@@ -86,9 +87,6 @@ def show():
     rate = round(s["done"] / s["total"] * 100) if s["total"] else 0
     c5.metric("완료", f"{s['done']}건", delta=f"완료율 {rate}%", delta_color="off")
 
-    if st.button("📲 현장 입력 (할 일 등록·상태 변경)", type="primary", width="stretch"):
-        st.session_state.page = "field_input"
-        st.rerun()
 
     st.markdown("---")
     left, right = st.columns(2)

@@ -45,16 +45,17 @@ def _set_status(row, status):
     load_memos.clear()
 
 
-def show():
-    st.title("📝 메모")
-    link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL), ("💬 Slack", SLACK_URL)])
+def show(embedded=False):
+    if not embedded:
+        st.title("📝 메모")
+        link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL), ("💬 Slack", SLACK_URL)])
 
     df = load_memos()
     if df is None:
         st.warning("⚠️ 메모 탭을 불러올 수 없습니다. " + st.session_state.get("memo_error", ""))
         return
 
-    with st.expander("➕ 새 메모", expanded=False):
+    with st.expander("➕ 새 메모", expanded=embedded):
         spoken = voice.voice_box("memo_voice", "🎤 말로 메모")
         with st.form(f"memo_form_{st.session_state.get('memo_voice_n', 0)}", clear_on_submit=True):
             c1, c2 = st.columns([3, 1])

@@ -247,8 +247,9 @@ def _tab_parts(data):
                      hide_index=True, width="stretch")
 
 
-def show():
-    st.title("🎫 작업 티켓")
+def show(embedded=False):
+    if not embedded:
+        st.title("🎫 작업 티켓")
     st.caption("작업지시서 발행 · 시작/일시정지/완료 기록 · 자재 위치 찾기")
     if not _check_pin():
         return

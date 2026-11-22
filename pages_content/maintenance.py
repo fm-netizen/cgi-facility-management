@@ -19,10 +19,12 @@ def _fmt(df, cols=COLS):
     return v
 
 
-def show():
-    st.title("🗓️ 메인트넌스 일정")
+def show(embedded=False):
+    if not embedded:
+        st.title("🗓️ 메인트넌스 일정")
     st.caption("정기 업무는 '📅 정기 일정 마스터'에서 관리되고, 매월 25일 다음 달 회차가 할 일로 자동 생성됩니다.")
-    link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL), ("📊 설비·시설 대장", MASTER_SHEET_URL)])
+    if not embedded:
+        link_buttons([("📋 할 일 관리표", TASK_TRACKER_URL), ("📊 설비·시설 대장", MASTER_SHEET_URL)])
 
     df = load_todos()
     if df is None:
@@ -50,9 +52,6 @@ def show():
     m[2].metric("기한 준수율", f"{round(len(on_time) / len(tm_done) * 100) if len(tm_done) else 0}%")
     m[3].metric("마감 초과", f"{len(overdue)}건", delta="확인" if len(overdue) else None, delta_color="inverse")
 
-    if st.button("📲 현장 입력에서 완료 처리", type="primary", width="stretch"):
-        st.session_state.page = "field_input"
-        st.rerun()
 
     for title, part in (("🔴 마감 초과", overdue), ("🟡 30일 내 예정", upcoming)):
         st.subheader(title)

@@ -7,6 +7,8 @@ import streamlit as st
 from pages_content.field_input import _check_pin
 from todo_store import load_todos, update_status, set_assignee, today
 from user_ctx import current_user, is_manager, workers
+import wo_store as ws
+from pages_content import work_orders as wop
 
 LEAD_TAG = "[팀장 요청]"
 
@@ -31,6 +33,40 @@ def _sort(df, t):
     return df.assign(_k=key, _u=urg).sort_values(["_u", "_k"])
 
 
+def _open_wo(todo_no):
+    d = ws.load_all()
+    if d is None:
+        return None, None
+    wo = d["wo"]
+    hit = wo[(wo["할일#"] == str(todo_no)) & wo["상태"].isin(ws.OPEN_WO)]
+    return (hit.iloc[-1] if not hit.empty else None), d
+
+
+def _mine_actions(r, me):
+    """WO가 있으면 작업 티켓 카드(시작·일시정지·완료 보고), 없으면 ▶ 시작 / ✅ 바로 완료."""
+    w, d = _open_wo(r["번호"])
+    if w is not None:
+        wop._wo_card(w, d, me, False)
+        return
+    c1, c2, c3 = st.columns([2, 1, 1])
+    note = c1.text_input("메모", key=f"n_{r['_row']}", label_visibility="collapsed",
+                         placeholder="완료 메모 (선택)")
+    if c2.button("▶ 시작", key=f"s_{r['_row']}", width="stretch",
+                 help="작업 시간을 기록합니다 (작업 티켓 자동 발행)"):
+        ok, msg = ws.issue_wo({"할일#": r["번호"], "작업유형": "정기점검(PM)" if r["정기 ID"] else "수리",
+                               "구역": "기타", "설비·위치": r["구역·설비 ID"], "작업내용": r["할 일"],
+                               "우선순위": r["우선순위"] or "보통", "배정구분": "기술", "책임자": me,
+                               "예정일": r["마감일"]}, me, also_todo=False)
+        if ok:
+            ok, msg = ws.start_work(msg.split()[0], me)
+        st.session_state.today_flash = (ok, msg)
+        st.rerun()
+    if c3.button("✅ 완료", key=f"d_{r['_row']}", width="stretch", type="primary"):
+        ok, msg = update_status(int(r["_row"]), "완료", note, me, r["비고"])
+        st.session_state.today_flash = (ok, f"#{r['번호']} {msg}")
+        st.rerun()
+
+
 def _row(r, t, me, kind):
     """한 줄 카드 + 버튼. kind: mine | pool | lead"""
     with st.container(border=True):
@@ -39,13 +75,7 @@ def _row(r, t, me, kind):
                             r["정기 ID"]) if x]
         st.markdown(top + "  \n" + " · ".join(meta))
         if kind == "mine":
-            c1, c2 = st.columns([3, 1])
-            note = c1.text_input("메모", key=f"n_{r['_row']}", label_visibility="collapsed",
-                                 placeholder="완료 메모 (선택)")
-            if c2.button("✅ 완료", key=f"d_{r['_row']}", width="stretch"):
-                ok, msg = update_status(int(r["_row"]), "완료", note, me, r["비고"])
-                st.session_state.today_flash = (ok, f"#{r['번호']} {msg}")
-                st.rerun()
+            _mine_actions(r, me)
         elif kind == "pool":
             if st.button("✋ 내가 맡기", key=f"c_{r['_row']}", width="stretch"):
                 ok, msg = set_assignee(int(r["_row"]), me, "담당 맡음", me, r["비고"])
@@ -62,7 +92,7 @@ def show():
         st.info("이름을 선택하면 내 할 일이 표시됩니다. 휴대폰 홈 화면에 저장해 두면 다음부터 자동으로 열립니다.")
         return
     t = today()
-    f = st.session_state.pop("today_flash", None)
+    f = st.session_state.pop("today_flash", None) or st.session_state.pop("wo_flash", None)
     if f:
         (st.success if f[0] else st.error)(f[1])
 
@@ -88,12 +118,8 @@ def show():
     c[2].metric("팀 공용 (7일 내)", f"{len(pool)}건")
     c[3].metric("🚨 긴급 진행", f"{len(emerg)}건")
 
-    b1, b2 = st.columns(2)
-    if b1.button("🚨 접수하기", type="primary", width="stretch"):
-        st.session_state.page = "report"
-        st.rerun()
-    if b2.button("🎫 내 작업 티켓", width="stretch"):
-        st.session_state.page = "work_orders"
+    if st.button("➕ 등록 (고장·할 일·메모)", type="primary", width="stretch"):
+        st.session_state.page = "register"
         st.rerun()
 
     if is_manager(role):
@@ -138,16 +164,25 @@ def show():
     for _, r in pool.head(30).iterrows():
         _row(r, t, me, "pool")
 
-    if is_manager(role):
-        st.subheader("📊 팀 현황")
-        rows = []
-        for n in (workers()["이름"].tolist() if workers() is not None else []):
-            m = open_df[_mine(open_df, n)]
-            rows.append({"이름": n, "미완료": len(m),
-                         "지연": int(m["마감일"].map(lambda d: d is not None and d < t).sum()),
-                         "진행 중": int((m["상태"] == "진행 중").sum()),
-                         "오늘 완료": int(((df["상태"] == "완료") & (df["완료일"] == t) & _mine(df, n)).sum())})
-        rows.append({"이름": "(미배정)", "미완료": int(unassigned.sum()), "지연": int(
-            open_df[unassigned]["마감일"].map(lambda d: d is not None and d < t).sum()),
-            "진행 중": 0, "오늘 완료": 0})
-        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+
+
+def team_status():
+    """팀장 관리 화면용 — 사람별 미완료·지연·진행 중·오늘 완료."""
+    df = load_todos()
+    if df is None:
+        st.caption("할 일 관리표를 불러올 수 없습니다.")
+        return
+    t = today()
+    open_df = df[df["상태"] != "완료"]
+    unassigned = open_df["담당자"].str.strip() == ""
+    rows = []
+    for n in (workers()["이름"].tolist() if workers() is not None else []):
+        m = open_df[_mine(open_df, n)]
+        rows.append({"이름": n, "미완료": len(m),
+                     "지연": int(m["마감일"].map(lambda d: d is not None and d < t).sum()),
+                     "진행 중": int((m["상태"] == "진행 중").sum()),
+                     "오늘 완료": int(((df["상태"] == "완료") & (df["완료일"] == t) & _mine(df, n)).sum())})
+    rows.append({"이름": "(미배정)", "미완료": int(unassigned.sum()), "지연": int(
+        open_df[unassigned]["마감일"].map(lambda d: d is not None and d < t).sum()),
+        "진행 중": 0, "오늘 완료": 0})
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)

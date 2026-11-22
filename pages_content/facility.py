@@ -15,11 +15,12 @@ def _author():
     return a
 
 
-def show():
-    st.title("🏢 시설 상황")
-    link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
-                  ("📋 할 일 관리표", TASK_TRACKER_URL),
-                  ("📁 공사 폴더", DRIVE_FOLDER_URL)])
+def show(embedded=False):
+    if not embedded:
+        st.title("🏢 시설 상황")
+        link_buttons([("📊 설비·시설 대장", MASTER_SHEET_URL),
+                      ("📋 할 일 관리표", TASK_TRACKER_URL),
+                      ("📁 공사 폴더", DRIVE_FOLDER_URL)])
 
     data = A.load_assets()
     if data is None:
@@ -34,7 +35,7 @@ def show():
     m[3].metric("🔧 수리·공사 중", c["🔧 수리·공사 중"])
     m[4].metric("🔴 고장·이상", c["🔴 고장·이상"])
 
-    f = st.selectbox("상태 필터", ["전체", "정상 아님"] + A.STATUSES)
+    f = st.selectbox("상태 필터", ["전체", "정상 아님"] + A.STATUSES, key="zone_filter")
     view = zones
     if f == "정상 아님":
         view = zones[zones["현재 상태"] != A.NORMAL]
@@ -45,7 +46,7 @@ def show():
     st.markdown("---")
     st.subheader("✏️ 상태 기록")
     st.caption("기록은 '📝 상태 기록' 탭에 한 줄씩 쌓이고, 표는 가장 최근 기록을 보여줍니다.")
-    if not _check_pin():
+    if not embedded and not _check_pin():
         return
     labels = [f"{r['구역ID']} · {r['구역명']}" for _, r in zones.iterrows()]
     if not labels:

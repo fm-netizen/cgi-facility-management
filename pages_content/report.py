@@ -22,12 +22,13 @@ def _flash():
             (st.success if ok else st.warning)(msg)
 
 
-def show():
-    st.title("🚨 접수")
-    st.caption("고장·민원·요청을 바로 등록합니다. 직접 처리할 수 있으면 '✋ 내가 처리', 어려우면 '📞 팀장 요청'.")
-    if not _check_pin():
-        return
-    me, _ = current_user()
+def show(embedded=False):
+    if not embedded:
+        st.title("🚨 접수")
+        if not _check_pin():
+            return
+    st.caption("직접 처리할 수 있으면 '✋ 내가 처리', 어려우면 '📞 팀장 요청'.")
+    me, _ = current_user(show_picker=not embedded)
     if not me:
         st.info("먼저 이름을 선택하세요.")
         return
