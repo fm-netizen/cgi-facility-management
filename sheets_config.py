@@ -27,6 +27,7 @@ MASTER_SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/edi
 TASK_TRACKER_URL = f"https://docs.google.com/spreadsheets/d/{TODO_SPREADSHEET_ID}/edit"
 DRIVE_FOLDER_URL = _folder("1BiHhsdzzhNzFjAvgnCN-a-TXUOyzQ6SL")   # 23.공사관련
 SYSTEM_FOLDER_URL = _folder("1iZGAygQTWYS1U5uHWz5UxfQ6_dRMvsB9")  # CGI_Facility_Management_Cording (시스템 전용)
+CONSTRUCTION_URL = "https://docs.google.com/spreadsheets/d/1b-xLM1UXhcpWb2Qp7tHOvuF0oZzKZPx4q1pY0jGMlNM/edit"  # 공사 예산·공정 (예산 금액은 여기에만)
 SLACK_URL        = "https://app.slack.com/client/T0B6V3G2AM9/C0CLRAGJV4G"  # #fm-team (비공개 채널, 앱 알림 채널)
 
 # 공사 프로젝트 폴더 (폴더 ID 기준 — 이름을 바꿔도 링크 유지)
@@ -57,6 +58,7 @@ PROJECT_FOLDERS = {
 QUICK_LINKS = {
     "📊 설비·시설 대장":          MASTER_SHEET_URL,
     "📋 할 일 관리표":            TASK_TRACKER_URL,
+    "🏗 공사 예산·공정":          CONSTRUCTION_URL,
     "📁 공사 폴더":               DRIVE_FOLDER_URL,
     "💬 Slack #fm-team":          SLACK_URL,
 }
